@@ -43,6 +43,8 @@ _BLOCKLIST = [
     (None, r"/rfids/export", _EXPORT),
     (None, r"/securitylogs/export", _EXPORT),
     (None, r"/mvas/export", _EXPORT),
+    (None, r"^/openapi\.json$", "liest das Gateway selbst (870 KB)"),
+    (None, r"/configs/system/resource/", _EXPORT),
 ]
 
 
