@@ -27,6 +27,32 @@ UDP_RETRY_INTERVAL = 60       # report 1, solange UDP nicht antwortet
 COMMAND_METHODS = ("get", "post", "put", "patch", "delete")
 
 
+def describe_operations(ops: list[Operation], enabled_ops: list, mqtt: MqttConfig) -> list[dict]:
+    """Endpunktliste für Doku und WebUI, inklusive freigeschalteter, aber unbekannter Einträge."""
+    enabled = {e.op for e in enabled_ops}
+    intervals = {e.op: e.interval for e in enabled_ops}
+    out = []
+    for o in ops:
+        interval = None
+        if o.pollable and o.op == CORE_GET:
+            interval = mqtt.core_interval
+        elif o.pollable and o.op in enabled:
+            interval = intervals.get(o.op) or mqtt.default_interval
+        out.append({
+            "op": o.op, "method": o.method, "path": o.path, "tag": o.tag,
+            "summary": o.summary, "description": o.description, "topic": o.topic,
+            "status": op_status(o, enabled), "pollable": o.pollable,
+            "block_reason": o.block_reason, "path_params": o.path_params,
+            "query_params": o.query_params, "body_schema": o.body_schema,
+            "response_schema": o.response_schema, "interval": interval,
+        })
+    for key in missing_enabled(ops, [e.op for e in enabled_ops]):
+        method, _, path = key.partition(" ")
+        out.append({"op": key, "method": method, "path": path, "status": "missing",
+                    "topic": "", "pollable": False, "interval": None})
+    return out
+
+
 def _result(ok: bool, status: int = 0, body=None, error: str = "") -> dict:
     return {"ok": ok, "status": status, "body": body, "error": error}
 
@@ -263,24 +289,7 @@ class BoxWorker:
             await self._pub("status", st, True)
 
     def operations(self) -> list[dict]:
-        enabled = set(self.enabled)
-        out = []
-        for o in self.ops:
-            out.append({
-                "op": o.op, "method": o.method, "path": o.path, "tag": o.tag,
-                "summary": o.summary, "description": o.description, "topic": o.topic,
-                "status": op_status(o, enabled), "pollable": o.pollable,
-                "block_reason": o.block_reason, "path_params": o.path_params,
-                "query_params": o.query_params, "body_schema": o.body_schema,
-                "response_schema": o.response_schema,
-                "interval": self._interval(o.op) if o.pollable and (
-                    o.op == CORE_GET or o.op in enabled) else None,
-            })
-        for key in missing_enabled(self.ops, self.enabled):
-            method, _, path = key.partition(" ")
-            out.append({"op": key, "method": method, "path": path, "status": "missing",
-                        "topic": "", "pollable": False, "interval": None})
-        return out
+        return describe_operations(self.ops, self.box.enabled, self.mqtt)
 
     # ---- Befehle ---------------------------------------------------------------------------
     def _path(self, op: Operation, params: dict) -> str:
