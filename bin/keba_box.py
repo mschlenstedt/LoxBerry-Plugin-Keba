@@ -255,9 +255,11 @@ class BoxWorker:
         }
 
     async def _udp_check(self) -> None:
+        if self.udp.state == "port_busy":
+            await self.udp.start()                     # Port inzwischen frei? (z. B. nach Upgrade)
         if self.udp.state != "ok":
             self.udp_state = self.udp.state
-            self._next_udp = self.clock() + UDP_CHECK_INTERVAL
+            self._next_udp = self.clock() + UDP_RETRY_INTERVAL
             return
         try:
             report = parse_report(await self.udp.send(self.serial, "report 1"))

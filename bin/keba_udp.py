@@ -74,6 +74,9 @@ class UdpHub:
         self._probe_lock = asyncio.Lock()
 
     async def start(self) -> None:
+        """Bindet den Port; bei port_busy später erneut aufrufbar, bei ok wirkungslos."""
+        if self.state == "ok":
+            return
         loop = asyncio.get_running_loop()
         try:
             self._transport, _ = await loop.create_datagram_endpoint(

@@ -7,7 +7,16 @@ LBHOME=$5     # LoxBerry-Basisordner
 PIDFILE="/dev/shm/keba_gateway.pid"
 if [ -f "$PIDFILE" ]; then
     echo "<INFO> Beende laufenden Gateway vor dem Upgrade"
-    kill "$(tr -dc '0-9' < "$PIDFILE")" 2>/dev/null
+    PID="$(tr -dc '0-9' < "$PIDFILE")"
+    if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
+        kill -TERM "$PID" 2>/dev/null
+        # Warten, bis er Port 7090 freigegeben hat – sonst bindet der neue Gateway ihn nicht
+        for _ in $(seq 1 20); do
+            kill -0 "$PID" 2>/dev/null || break
+            sleep 1
+        done
+        kill -0 "$PID" 2>/dev/null && kill -KILL "$PID" 2>/dev/null
+    fi
     rm -f "$PIDFILE"
 fi
 
