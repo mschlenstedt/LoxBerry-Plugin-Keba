@@ -172,7 +172,10 @@ function renderOverview(s, cfg) {
 	(cfg.boxes || []).forEach(function (b) { users[b.id] = b.username; });
 	var ids = Object.keys(statuses);
 	var active = ids.filter(function (id) { return statuses[id].active !== false; });
-	var complete = active.filter(function (id) { return statuses[id].api === 'ok' && statuses[id].udp === 'ok'; });
+	var complete = active.filter(function (id) {
+		var b = statuses[id];
+		return b.online !== false && b.api === 'ok' && b.udp === 'ok' && !b.error;
+	});
 	var boxPill = $('ov-box-pill');
 	if (!ids.length) {
 		boxPill.outerHTML = '<span class="kb-pill off" id="ov-box-pill">0</span>';
@@ -200,14 +203,17 @@ function boxCard(id, b, username) {
 		return '<article class="lb-card kb-card kb-inactive">' + head + pill('off', t('STATE.INACTIVE')) + '</div>'
 			+ '<div class="kb-body kb-muted">' + esc(t('OVERVIEW.INACTIVE_DESC')) + '</div></article>';
 	}
-	head += '<div class="kb-pills">' + apiPill(b.api) + udpPill(b.udp) + '</div></div>';
+	head += '<div class="kb-pills">' + (b.online === false ? pill('err', t('STATE.OFFLINE')) : '')
+		+ apiPill(b.api) + udpPill(b.udp) + '</div></div>';
 
 	var notes = [];
 	if (b.error === 'serial_mismatch') notes.push(t('OVERVIEW.NOTE_SERIAL'));
 	else if (b.api === 'api_off') notes.push(t('OVERVIEW.NOTE_API_OFF'));
 	else if (b.api === 'auth_failed') notes.push(t('OVERVIEW.NOTE_AUTH'));
 	else if (b.api === 'unreachable' && b.udp !== 'ok') notes.push(t('OVERVIEW.NOTE_UNREACHABLE'));
-	if (b.udp && b.udp !== 'ok' && b.udp !== 'unknown' && b.api === 'ok') notes.push(t('OVERVIEW.NOTE_UDP'));
+	else if (b.error && b.error !== 'serial_mismatch') notes.push(tf('OVERVIEW.NOTE_ERROR', b.error));
+	if (b.udp === 'timeout' && b.api === 'ok') notes.push(t('OVERVIEW.NOTE_UDP'));
+	if (b.udp === 'port_busy') notes.push(t('OVERVIEW.NOTE_PORT_BUSY'));
 	if (b.missing && b.missing.length) notes.push(tf('OVERVIEW.NOTE_MISSING', b.missing.join(', ')));
 
 	var live = b.live || {};
@@ -582,7 +588,7 @@ function initDocs() {
 			groups[tag].forEach(function (o) {
 				var isOpen = !!open[o.op];
 				html.push('<tr class="kb-row' + (o.status === 'blocked' ? ' kb-blocked' : '') + '">'
-					+ '<td><span class="kb-m ' + o.method.toLowerCase() + '">' + esc(o.method) + '</span></td>'
+					+ '<td><span class="kb-m ' + esc(o.method.toLowerCase()) + '">' + esc(o.method) + '</span></td>'
 					+ '<td><button type="button" class="kb-pathbtn" data-open="' + esc(o.op) + '" aria-expanded="' + isOpen + '">'
 					+ '<i class="pi ' + (isOpen ? 'pi-chevron-down' : 'pi-chevron-right') + '"></i><span class="kb-mono">' + esc(o.path) + '</span></button></td>'
 					+ '<td class="kb-desc">' + esc(o.summary || '') + '</td>'

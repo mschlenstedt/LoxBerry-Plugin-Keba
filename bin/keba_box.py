@@ -74,6 +74,7 @@ class BoxWorker:
         self.last_udp = 0.0
         self.online = False
         self.live: dict = {}
+        self.rest_error = ""
         self._ready = False
         self._setup_backoff = Backoff()
         self._next_setup = 0.0
@@ -222,6 +223,7 @@ class BoxWorker:
 
     async def _core_result(self, res) -> None:
         self.last_poll = self.clock()
+        self.rest_error = "" if res.ok or res.status else res.error
         self.online = res.ok or self.udp_state == "ok"
         if not res.ok or not isinstance(res.body, dict):
             return
@@ -267,11 +269,17 @@ class BoxWorker:
             self.online = True
 
     # ---- Status ----------------------------------------------------------------------------
+    def _api_state(self) -> str:
+        """Anmeldezustand, aber eine gerade gescheiterte Abfrage (Box weg) hat Vorrang."""
+        if self.rest.auth_state == "ok" and self.rest_error == "unreachable":
+            return "unreachable"
+        return self.rest.auth_state if self.rest.auth_state != "none" else "unknown"
+
     def status(self) -> dict:
         return {
             "id": self.box.id, "name": self.box.name, "serial": self.serial,
             "host": self.box.host, "online": self.online,
-            "api": self.rest.auth_state if self.rest.auth_state != "none" else "unknown",
+            "api": self._api_state(),
             "udp": self.udp_state, "auth": self.rest.auth_state,
             "token_expires": self.rest.token_expires, "refresh_expires": self.rest.refresh_expires,
             "last_poll": self.last_poll, "last_udp": self.last_udp,

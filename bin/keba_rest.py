@@ -121,12 +121,17 @@ class KebaRest:
         log.warning("%s: Anmeldung fehlgeschlagen (%s: %s), neuer Versuch in %d s",
                     self.host, state, detail, delay)
 
-    def _set_access(self, token: str) -> None:
+    def _local_expiry(self, token: str, default: float) -> float:
+        """Ablaufzeit in LoxBerry-Zeit: Laufzeit (exp − iat) ab jetzt. Die Uhr der Box kann
+        falsch gehen; exp direkt zu vergleichen würde dann ständig neu anmelden."""
         iat, exp = jwt_times(token)
-        now = self.clock()
+        lifetime = exp - iat if exp and exp > iat else default
+        return self.clock() + lifetime
+
+    def _set_access(self, token: str) -> None:
         self._access = token
-        self.token_expires = exp or now + 900
-        self._token_issued = iat if exp else now
+        self._token_issued = self.clock()
+        self.token_expires = self._local_expiry(token, 900)
 
     async def login(self) -> None:
         url = self.base + "/v2/jwt/login"
@@ -136,7 +141,9 @@ class KebaRest:
                 raw = await resp.read()
                 status = resp.status
         except (aiohttp.ClientError, asyncio.TimeoutError, OSError) as exc:
-            self._fail("unreachable", type(exc).__name__)
+            # Abgewiesene Verbindung = Box antwortet, Port 8443 zu → API aus (Spec §13)
+            refused = isinstance(getattr(exc, "os_error", exc), ConnectionRefusedError)
+            self._fail("api_off" if refused else "unreachable", type(exc).__name__)
             return
         if status == 404:
             self._fail("api_off", "HTTP 404 auf /v2/jwt/login")
@@ -151,7 +158,7 @@ class KebaRest:
             return
         self._set_access(body["accessToken"])
         self._refresh = body.get("refreshToken") or ""
-        self.refresh_expires = jwt_times(self._refresh)[1] if self._refresh else 0.0
+        self.refresh_expires = self._local_expiry(self._refresh, 2592000) if self._refresh else 0.0
         self.auth_state, self.auth_error, self.retry_at = "ok", "", 0.0
         self.backoff.reset()
         log.info("%s: angemeldet, Access-Token bis %s", self.host,
@@ -174,7 +181,7 @@ class KebaRest:
         self._set_access(body["accessToken"])
         if body.get("refreshToken"):
             self._refresh = body["refreshToken"]
-            self.refresh_expires = jwt_times(self._refresh)[1]
+            self.refresh_expires = self._local_expiry(self._refresh, 2592000)
         log.info("%s: Access-Token erneuert", self.host)
         return True
 
