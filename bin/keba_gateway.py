@@ -89,6 +89,20 @@ class Gateway:
         self._last_status_write = 0.0
         self._shutdown = asyncio.Event()
         self._reconnect = asyncio.Event()
+        self._reload_lock = asyncio.Lock()
+        self._bg: set[asyncio.Task] = set()
+
+    def spawn(self, coro) -> asyncio.Task:
+        """Hintergrund-Task mit gehaltener Referenz (sonst kann ihn der GC einsammeln)."""
+        task = asyncio.create_task(coro)
+        self._bg.add(task)
+        task.add_done_callback(self._task_done)
+        return task
+
+    def _task_done(self, task: asyncio.Task) -> None:
+        self._bg.discard(task)
+        if not task.cancelled() and task.exception() is not None:
+            log.error("Hintergrund-Task fehlgeschlagen: %r", task.exception())
 
     @property
     def base(self) -> str:
@@ -96,6 +110,11 @@ class Gateway:
 
     # ---- Konfiguration und Worker ----------------------------------------------------------
     async def apply_config(self) -> None:
+        # Mehrere SIGHUP kurz hintereinander: nacheinander abarbeiten, nie verschränkt.
+        async with self._reload_lock:
+            await self._apply_config()
+
+    async def _apply_config(self) -> None:
         try:
             cfg = load_config(self.configdir / "pluginconfig.json")
         except ConfigError as exc:
@@ -301,7 +320,7 @@ class Gateway:
         async for msg in client.messages:
             payload = msg.payload if isinstance(msg.payload, (bytes, bytearray)) else \
                 str(msg.payload or "").encode()
-            asyncio.create_task(self.on_message(str(msg.topic), bytes(payload), bool(msg.retain)))
+            self.spawn(self.on_message(str(msg.topic), bytes(payload), bool(msg.retain)))
 
     async def _housekeeping(self, loglevel_watch) -> None:
         last_hb = last_lvl = 0.0
@@ -455,7 +474,7 @@ async def amain(args) -> int:
             loop = asyncio.get_running_loop()
             loop.add_signal_handler(signal.SIGTERM, gw.shutdown)
             loop.add_signal_handler(signal.SIGINT, gw.shutdown)
-            loop.add_signal_handler(signal.SIGHUP, lambda: asyncio.create_task(gw.apply_config()))
+            loop.add_signal_handler(signal.SIGHUP, lambda: gw.spawn(gw.apply_config()))
             await gw.run(broker_kwargs(), loglevel_watch)
     finally:
         await hub.close()
