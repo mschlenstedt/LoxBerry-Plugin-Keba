@@ -16,7 +16,7 @@ from typing import Awaitable, Callable
 from keba_config import BoxConfig, MqttConfig
 from keba_openapi import Operation, missing_enabled, op_status, parse_openapi, validate
 from keba_rest import Backoff, KebaRest, RestError
-from keba_udp import UdpHub, display_command, parse_report, validate_udp_command
+from keba_udp import UdpHub, display_request, parse_report, validate_udp_command
 
 log = logging.getLogger("keba.box")
 
@@ -386,8 +386,14 @@ class BoxWorker:
         return params, query, body
 
     async def _udp_command(self, topic_rest: str, payload: bytes) -> None:
-        text = payload.decode("utf-8", errors="replace").strip()
-        cmd = display_command(text) if topic_rest == "display/set" else text
+        if topic_rest == "display/set":
+            try:
+                cmd = display_request(payload)
+            except ValueError as exc:
+                await self._pub("udp/result", _result(False, error=f"invalid payload: {exc}"))
+                return
+        else:
+            cmd = payload.decode("utf-8", errors="replace").strip()
         err = validate_udp_command(cmd)
         if err:
             await self._pub("udp/result", _result(False, error=err))

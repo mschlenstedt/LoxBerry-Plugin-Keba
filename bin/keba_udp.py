@@ -31,10 +31,46 @@ def validate_udp_command(text: str) -> str:
     return ""
 
 
-def display_command(text: str) -> str:
+DISPLAY_MIN = 10          # s: so lange bleibt der Text mindestens stehen (neue display-Befehle warten)
+DISPLAY_MAX = 30          # s: so lange steht der Text, wenn nichts folgt
+DISPLAY_LIMIT = 86400     # s: Obergrenze für min/max (der Guide nennt keine)
+
+
+def display_command(text: str, min_s: int = DISPLAY_MIN, max_s: int = DISPLAY_MAX,
+                    box_default: bool = False) -> str:
+    """UDP `display [a] [min] [max] [tk] [text]` (Guide V2.05, 4.2.12). a=0: Zeiten der Box
+    (2 s/10 s), a=1: min/max wie angegeben; tk nur intern, immer 0. $ = Leerzeichen, ~ = Σ."""
     t = "".join(c if c.isascii() and c.isprintable() else "_" for c in text)
     t = t.replace(" ", "$")[:DISPLAY_LEN]
-    return "display 1 10 30 0 " + t
+    if box_default:
+        return f"display 0 0 0 0 {t}"
+    return f"display 1 {int(min_s)} {int(max_s)} 0 {t}"
+
+
+def display_request(payload: bytes) -> str:
+    """Payload von `<sn>/display/set`: reiner Text oder JSON
+    {"text": "...", "min": s, "max": s, "default": bool}. ValueError bei ungültiger Angabe."""
+    raw = (payload or b"").decode("utf-8", errors="replace").strip()
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        data = raw
+    if isinstance(data, str):
+        return display_command(data)
+    if not isinstance(data, dict):
+        raise ValueError("Text oder JSON-Objekt erwartet")
+    text = data.get("text")
+    if not isinstance(text, str):
+        raise ValueError("Feld text fehlt")
+    if data.get("default"):
+        return display_command(text, box_default=True)
+    times = {}
+    for key, default in (("min", DISPLAY_MIN), ("max", DISPLAY_MAX)):
+        value = data.get(key, default)
+        if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= DISPLAY_LIMIT:
+            raise ValueError(f"{key} muss eine ganze Zahl von 0 bis {DISPLAY_LIMIT} sein")
+        times[key] = value
+    return display_command(text, times["min"], times["max"])
 
 
 def parse_report(text: str) -> dict:

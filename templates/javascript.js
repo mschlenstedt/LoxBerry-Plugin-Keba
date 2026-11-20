@@ -359,11 +359,13 @@ function initSettings() {
 		btn.disabled = true;
 		ajax('savebox', d).then(function (r) {
 			if (!r.ok) { toast($('f-toast'), r.error || t('COMMON.ERROR'), true); return; }
-			if (r.check && r.check.steps) renderChecks(r.check.steps);
-			toast($('f-toast'), t(r.serial ? 'COMMON.SAVED' : 'SETTINGS.SAVED_NOSERIAL'));
+			// Gespeichert: Formular schließen, Meldung an der Box-Tabelle
+			editing = null;
+			$('st-form').hidden = true;
+			$('f-toast').className = 'kb-toast';
 			return load().then(function () {
-				var box = cfg.boxes.filter(function (b) { return b.id === r.id; })[0];
-				if (box) { editing = box; $('f-delete').hidden = false; renderTable(); }
+				toast($('st-toast'), t(r.serial ? 'COMMON.SAVED' : 'SETTINGS.SAVED_NOSERIAL'));
+				$('st-rows').closest('section').scrollIntoView({ behavior: 'smooth', block: 'start' });
 			});
 		}).catch(function (e) { toast($('f-toast'), e.message, true); }).then(function () { btn.disabled = false; });
 	};
