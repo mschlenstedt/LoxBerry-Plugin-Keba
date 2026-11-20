@@ -1,0 +1,8 @@
+#!/bin/bash
+# Ruft jede Minute den Watchdog des KEBA-Gateways (läuft als loxberry).
+SELF="$(readlink -f "$0")"
+PLUGIN="$(basename "$SELF")"
+if [ -z "$LBHOMEDIR" ]; then
+    LBHOMEDIR="${SELF%/system/cron/*}"
+fi
+exec "$LBHOMEDIR/bin/plugins/$PLUGIN/watchdog.sh"
