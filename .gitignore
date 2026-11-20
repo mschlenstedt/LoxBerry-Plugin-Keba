@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.superpowers/
+docs/superpowers/
+tests/
+CLAUDE.md
+KEBA-Schnittstellen-Erkenntnisse.md
