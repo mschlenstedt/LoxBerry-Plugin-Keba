@@ -24,6 +24,8 @@ from keba_config import ConfigError, load_config
 DEFAULT_SHMDIR = "/dev/shm/keba"
 PID_FILE = Path("/dev/shm/keba_gateway.pid")
 UDP_TIMEOUT = 5.0
+CHECK_TIMEOUT = 10.0   # REST-Teil der Prüfung; mit UDP zusammen ≤ 15 s (Spec §11)
+REST_KEYS = ("login", "serial", "version", "openapi")
 
 
 # ---- Maskierung für die Diagnose -------------------------------------------------------------
@@ -119,7 +121,7 @@ async def check(host: str, username: str, password: str, port: int = 8443, schem
         steps.append({"key": key, "ok": ok, "value": value, "error": error,
                       "ms": int((time.monotonic() - t0) * 1000)})
 
-    async with aiohttp.ClientSession() as session:
+    async def rest_steps(session):
         rest = KebaRest(host, username, password, session, port=port, scheme=scheme)
         t0 = time.monotonic()
         await rest.login()
@@ -127,6 +129,8 @@ async def check(host: str, username: str, password: str, port: int = 8443, schem
             step("login", True, "angemeldet", t0=t0)
         else:
             step("login", False, error=f"{rest.auth_state}: {rest.auth_error}", t0=t0)
+            if rest.auth_state == "unreachable":
+                return                                   # restliche REST-Schritte sinnlos
 
         version = ""
         for key in ("serial", "version"):
@@ -157,6 +161,19 @@ async def check(host: str, username: str, password: str, port: int = 8443, schem
             if res.ok and isinstance(res.body, dict):
                 result["firmware"] = str(res.body.get("firmwareVersion", ""))
                 result["model"] = str(res.body.get("model", ""))
+
+    t_rest = time.monotonic()
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with asyncio.timeout(CHECK_TIMEOUT):
+                await rest_steps(session)
+        except TimeoutError:
+            pass
+    done = {s["key"] for s in steps}
+    for key in REST_KEYS:
+        if key not in done:
+            step(key, False, error="timeout" if time.monotonic() - t_rest >= CHECK_TIMEOUT
+                 else "übersprungen", t0=time.monotonic())
 
     t0 = time.monotonic()
     try:
