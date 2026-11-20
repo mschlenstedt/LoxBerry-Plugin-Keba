@@ -1,0 +1,90 @@
+<div class="lb-content kb-page" id="kb-page" data-form="settings">
+
+<h2 class="kb-title"><TMPL_VAR SETTINGS.TITLE></h2>
+<p class="kb-lead"><TMPL_VAR SETTINGS.LEAD></p>
+
+<div id="kb-error"></div>
+
+<section class="lb-card kb-card">
+	<div class="kb-head"><h3><TMPL_VAR SETTINGS.REQ_TITLE></h3></div>
+	<div class="kb-body">
+		<div class="kb-req">
+			<div>
+				<span class="kb-eyebrow"><TMPL_VAR SETTINGS.REQ_API></span>
+				<b><TMPL_VAR SETTINGS.REQ_API_HOW></b>
+				<span class="kb-sub"><TMPL_VAR SETTINGS.REQ_API_SUB></span>
+			</div>
+			<div>
+				<span class="kb-eyebrow"><TMPL_VAR SETTINGS.REQ_UDP></span>
+				<b><TMPL_VAR SETTINGS.REQ_UDP_HOW></b>
+				<span class="kb-sub"><TMPL_VAR SETTINGS.REQ_UDP_SUB></span>
+			</div>
+		</div>
+	</div>
+</section>
+
+<section class="lb-card kb-card">
+	<div class="kb-head">
+		<h3><TMPL_VAR SETTINGS.BOXES></h3>
+		<button type="button" class="lb-btn lb-btn-primary lb-btn-sm" id="st-add"><i class="pi pi-plus"></i> <TMPL_VAR OVERVIEW.ADD_BOX></button>
+	</div>
+	<div class="lb-table-scroll">
+		<table class="lb-table kb-table">
+			<thead><tr>
+				<th><TMPL_VAR SETTINGS.COL_NAME></th><th><TMPL_VAR SETTINGS.COL_SERIAL></th><th><TMPL_VAR SETTINGS.COL_HOST></th>
+				<th><TMPL_VAR SETTINGS.COL_MODEL></th><th><TMPL_VAR COMMON.API></th><th><TMPL_VAR COMMON.UDP></th>
+				<th><TMPL_VAR SETTINGS.COL_ACTIVE></th><th></th>
+			</tr></thead>
+			<tbody id="st-rows"><tr><td colspan="8" class="kb-muted"><TMPL_VAR COMMON.LOADING></td></tr></tbody>
+		</table>
+	</div>
+</section>
+
+<section class="lb-card kb-card" id="st-form" hidden>
+	<div class="kb-head"><h3 id="st-form-title"></h3></div>
+	<div class="kb-body">
+		<div class="kb-form">
+			<div class="kb-field">
+				<label class="lb-form-label" for="f-name"><TMPL_VAR SETTINGS.F_NAME></label>
+				<input class="lb-input" id="f-name" type="text" maxlength="64">
+				<p class="lb-form-help"><TMPL_VAR SETTINGS.F_NAME_HELP></p>
+			</div>
+			<div class="kb-field">
+				<label class="lb-form-label" for="f-host"><TMPL_VAR SETTINGS.F_HOST></label>
+				<input class="lb-input" id="f-host" type="text" maxlength="253" autocomplete="off">
+				<p class="lb-form-help"><TMPL_VAR SETTINGS.F_HOST_HELP></p>
+			</div>
+			<div class="kb-field">
+				<label class="lb-form-label" for="f-user"><TMPL_VAR SETTINGS.F_USER></label>
+				<input class="lb-input" id="f-user" type="text" value="admin" autocomplete="off">
+			</div>
+			<div class="kb-field">
+				<label class="lb-form-label" for="f-pw"><TMPL_VAR SETTINGS.F_PW></label>
+				<div class="kb-pw">
+					<input class="lb-input" id="f-pw" type="password" autocomplete="new-password">
+					<button type="button" class="lb-btn lb-btn-sm lb-btn-icon" id="f-pw-eye" aria-label="<TMPL_VAR SETTINGS.SHOW_PW>"><i class="pi pi-eye"></i></button>
+				</div>
+				<p class="lb-form-help" id="f-pw-help"><TMPL_VAR SETTINGS.F_PW_HELP></p>
+			</div>
+			<div class="kb-field">
+				<label class="lb-form-label" for="f-active"><TMPL_VAR SETTINGS.F_ACTIVE></label>
+				<label class="lb-toggle"><input type="checkbox" id="f-active" checked><span class="lb-toggle-slider"></span></label>
+				<p class="lb-form-help"><TMPL_VAR SETTINGS.F_ACTIVE_HELP></p>
+			</div>
+		</div>
+		<div class="kb-field" id="f-check-wrap" hidden>
+			<span class="lb-form-label"><TMPL_VAR SETTINGS.CHECK_RESULT></span>
+			<ul class="kb-checks" id="f-checks"></ul>
+		</div>
+	</div>
+	<div class="kb-foot">
+		<button type="button" class="lb-btn lb-btn-danger lb-btn-sm" id="f-delete"><i class="pi pi-trash"></i> <span><TMPL_VAR SETTINGS.DELETE></span></button>
+		<span class="kb-grow"></span>
+		<span class="kb-toast" id="f-toast" role="status"></span>
+		<button type="button" class="lb-btn lb-btn-sm" id="f-check"><i class="pi pi-bolt"></i> <TMPL_VAR SETTINGS.CHECK></button>
+		<button type="button" class="lb-btn lb-btn-sm" id="f-cancel"><TMPL_VAR COMMON.CANCEL></button>
+		<button type="button" class="lb-btn lb-btn-primary lb-btn-sm" id="f-save"><i class="pi pi-save"></i> <TMPL_VAR COMMON.SAVE></button>
+	</div>
+</section>
+
+</div>

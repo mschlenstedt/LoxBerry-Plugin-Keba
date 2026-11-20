@@ -1,0 +1,25 @@
+<div class="lb-content kb-page" id="kb-page" data-form="logfiles">
+
+<h2 class="kb-title"><TMPL_VAR LOGS.TITLE></h2>
+<p class="kb-lead"><TMPL_VAR LOGS.LEAD></p>
+
+<section class="lb-card kb-card">
+	<div class="kb-head">
+		<h3><TMPL_VAR LOGS.DIAG></h3>
+		<div class="kb-actions">
+			<button type="button" class="lb-btn lb-btn-primary lb-btn-sm" id="dg-run"><i class="pi pi-search"></i> <TMPL_VAR LOGS.DIAG_RUN></button>
+			<button type="button" class="lb-btn lb-btn-sm" id="dg-copy" hidden><i class="pi pi-copy"></i> <TMPL_VAR LOGS.DIAG_COPY></button>
+			<span class="kb-toast" id="dg-toast" role="status"></span>
+		</div>
+	</div>
+	<div class="kb-body">
+		<p class="kb-sub"><TMPL_VAR LOGS.DIAG_HINT></p>
+		<div id="kb-error"></div>
+		<pre class="kb-out" id="dg-out" hidden></pre>
+	</div>
+</section>
+
+<h2 class="kb-title kb-gap"><TMPL_VAR COMMON.TAB_LOGFILES></h2>
+<TMPL_VAR LOGLIST>
+
+</div>

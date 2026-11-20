@@ -1,0 +1,54 @@
+<div class="lb-content kb-page" id="kb-page" data-form="docs">
+
+<h2 class="kb-title"><TMPL_VAR DOCS.TITLE></h2>
+<p class="kb-lead"><TMPL_VAR DOCS.LEAD></p>
+
+<div id="kb-error"></div>
+
+<section class="lb-card kb-card">
+	<div class="kb-head">
+		<div class="kb-seg" id="d-boxes" role="group" aria-label="<TMPL_VAR COMMON.PICK_BOX>"></div>
+		<div class="kb-meta" id="d-meta"></div>
+		<button type="button" class="lb-btn lb-btn-sm" id="d-refresh"><i class="pi pi-refresh"></i> <TMPL_VAR DOCS.REFRESH></button>
+	</div>
+	<div class="kb-tools">
+		<div class="kb-chips" id="d-chips" role="group" aria-label="<TMPL_VAR DOCS.FILTER>"></div>
+		<input class="lb-input kb-search" id="d-search" type="search" placeholder="<TMPL_VAR DOCS.SEARCH>" aria-label="<TMPL_VAR DOCS.SEARCH>">
+	</div>
+	<div class="lb-table-scroll">
+		<table class="lb-table kb-table kb-doc">
+			<thead><tr><th><TMPL_VAR DOCS.COL_METHOD></th><th><TMPL_VAR DOCS.COL_PATH></th><th><TMPL_VAR DOCS.COL_DESC></th><th><TMPL_VAR DOCS.COL_TOPIC></th><th><TMPL_VAR DOCS.COL_STATUS></th></tr></thead>
+			<tbody id="d-rows"><tr><td colspan="5" class="kb-muted"><TMPL_VAR COMMON.LOADING></td></tr></tbody>
+		</table>
+	</div>
+	<div class="kb-body"><div class="lb-callout kb-note"><TMPL_VAR DOCS.NOTE></div></div>
+</section>
+
+<section class="lb-card kb-card">
+	<div class="kb-head">
+		<h3><TMPL_VAR DOCS.UDP_TITLE></h3>
+		<span class="kb-sub"><TMPL_VAR DOCS.UDP_SUB></span>
+	</div>
+	<div class="lb-table-scroll">
+		<table class="lb-table kb-table">
+			<thead><tr><th><TMPL_VAR DOCS.UDP_CMD></th><th><TMPL_VAR DOCS.UDP_EFFECT></th><th><TMPL_VAR DOCS.UDP_PAYLOAD> <span class="kb-mono" id="d-udp-topic"></span></th><th><TMPL_VAR DOCS.UDP_REST></th></tr></thead>
+			<tbody>
+				<tr><td class="kb-mono kb-nw">display</td><td><TMPL_VAR UDP.DISPLAY></td><td class="kb-mono">display 1 10 30 0 Hallo$Welt</td><td class="kb-no"><TMPL_VAR UDP.NO></td></tr>
+				<tr><td class="kb-mono kb-nw">curr</td><td><TMPL_VAR UDP.CURR></td><td class="kb-mono">curr 16000</td><td><TMPL_VAR UDP.CURR_REST></td></tr>
+				<tr><td class="kb-mono kb-nw">currtime</td><td><TMPL_VAR UDP.CURRTIME></td><td class="kb-mono">currtime 16000 1</td><td><TMPL_VAR UDP.CURR_REST></td></tr>
+				<tr><td class="kb-mono kb-nw">setenergy</td><td><TMPL_VAR UDP.SETENERGY></td><td class="kb-mono">setenergy 100000</td><td class="kb-no"><TMPL_VAR UDP.NO></td></tr>
+				<tr><td class="kb-mono kb-nw">failsafe</td><td><TMPL_VAR UDP.FAILSAFE></td><td class="kb-mono">failsafe 60 6000 0</td><td class="kb-no"><TMPL_VAR UDP.NO></td></tr>
+				<tr><td class="kb-mono kb-nw">output</td><td><TMPL_VAR UDP.OUTPUT></td><td class="kb-mono">output 1</td><td class="kb-no"><TMPL_VAR UDP.NO></td></tr>
+				<tr><td class="kb-mono kb-nw">setdatetime</td><td><TMPL_VAR UDP.SETDATETIME></td><td class="kb-mono">setdatetime 1795190000</td><td><TMPL_VAR UDP.SETDATETIME_REST></td></tr>
+				<tr><td class="kb-mono kb-nw">ena</td><td><TMPL_VAR UDP.ENA></td><td class="kb-mono">ena 1</td><td><TMPL_VAR UDP.ENA_REST></td></tr>
+				<tr><td class="kb-mono kb-nw">start · stop</td><td><TMPL_VAR UDP.STARTSTOP></td><td class="kb-mono">start &lt;rfid&gt;</td><td><TMPL_VAR UDP.STARTSTOP_REST></td></tr>
+				<tr><td class="kb-mono kb-nw">unlock</td><td><TMPL_VAR UDP.UNLOCK></td><td class="kb-mono">unlock</td><td><TMPL_VAR UDP.UNLOCK_REST></td></tr>
+				<tr><td class="kb-mono kb-nw">x2 · x2src</td><td><TMPL_VAR UDP.X2></td><td class="kb-mono">x2 1</td><td><TMPL_VAR UDP.X2_REST></td></tr>
+				<tr><td class="kb-mono kb-nw">report · i</td><td><TMPL_VAR UDP.REPORT></td><td class="kb-mono">report 2</td><td><TMPL_VAR UDP.REPORT_REST></td></tr>
+			</tbody>
+		</table>
+	</div>
+	<div class="kb-body"><div class="lb-callout kb-note"><TMPL_VAR DOCS.DISPLAY_NOTE> <span class="kb-mono" id="d-display-topic"></span></div></div>
+</section>
+
+</div>

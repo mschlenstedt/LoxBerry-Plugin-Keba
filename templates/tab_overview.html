@@ -1,0 +1,32 @@
+<div class="lb-content kb-page" id="kb-page" data-form="overview">
+
+<h2 class="kb-title"><TMPL_VAR OVERVIEW.TITLE></h2>
+<p class="kb-lead"><TMPL_VAR OVERVIEW.LEAD> <a href="<TMPL_VAR WIKI_URL>" target="_blank" rel="noopener"><TMPL_VAR COMMON.MORE></a></p>
+
+<div id="kb-error"></div>
+
+<section class="kb-strip">
+	<div class="lb-card kb-tile">
+		<div class="kb-split"><span class="kb-eyebrow"><TMPL_VAR OVERVIEW.GATEWAY></span><span class="kb-pill" id="ov-gw-pill"><TMPL_VAR COMMON.LOADING></span></div>
+		<div class="kb-desc" id="ov-gw-desc"></div>
+		<div class="kb-actions">
+			<button type="button" class="lb-btn lb-btn-sm" id="ov-restart"><i class="pi pi-refresh"></i> <TMPL_VAR OVERVIEW.RESTART></button>
+			<button type="button" class="lb-btn lb-btn-sm" id="ov-stop"><i class="pi pi-power-off"></i> <TMPL_VAR OVERVIEW.STOP></button>
+			<span class="kb-toast" id="ov-gw-toast" role="status"></span>
+		</div>
+	</div>
+	<div class="lb-card kb-tile">
+		<div class="kb-split"><span class="kb-eyebrow"><TMPL_VAR OVERVIEW.MQTT></span><span class="kb-pill" id="ov-mqtt-pill"></span></div>
+		<div class="kb-desc" id="ov-mqtt-desc"></div>
+		<div class="kb-actions"><a class="lb-btn lb-btn-sm" href="index.cgi?form=mqtt"><TMPL_VAR OVERVIEW.MQTT_SETTINGS></a></div>
+	</div>
+	<div class="lb-card kb-tile">
+		<div class="kb-split"><span class="kb-eyebrow"><TMPL_VAR OVERVIEW.BOXES></span><span class="kb-pill" id="ov-box-pill"></span></div>
+		<div class="kb-desc" id="ov-box-desc"></div>
+		<div class="kb-actions"><a class="lb-btn lb-btn-sm lb-btn-primary" href="index.cgi?form=settings&amp;new=1"><i class="pi pi-plus"></i> <TMPL_VAR OVERVIEW.ADD_BOX></a></div>
+	</div>
+</section>
+
+<section class="kb-boxes" id="ov-boxes"></section>
+
+</div>

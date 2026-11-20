@@ -1,0 +1,71 @@
+<div class="lb-content kb-page" id="kb-page" data-form="mqtt">
+
+<h2 class="kb-title"><TMPL_VAR MQTT.TITLE></h2>
+<p class="kb-lead"><TMPL_VAR MQTT.LEAD></p>
+
+<div id="kb-error"></div>
+
+<section class="lb-card kb-card">
+	<div class="kb-head"><h3><TMPL_VAR MQTT.GENERAL></h3></div>
+	<div class="kb-body">
+		<div class="kb-form">
+			<div class="kb-field">
+				<label class="lb-form-label" for="m-base"><TMPL_VAR MQTT.BASE></label>
+				<input class="lb-input kb-mono" id="m-base" type="text" maxlength="100">
+				<p class="lb-form-help"><TMPL_VAR MQTT.BASE_HELP> <span class="kb-mono" id="m-base-ex"></span></p>
+			</div>
+			<div class="kb-field">
+				<label class="lb-form-label" for="m-core"><TMPL_VAR MQTT.CORE></label>
+				<div class="kb-unit"><input class="lb-input" id="m-core" type="number" min="5" step="1"><span><TMPL_VAR COMMON.SECONDS></span></div>
+				<p class="lb-form-help"><TMPL_VAR MQTT.CORE_HELP></p>
+			</div>
+			<div class="kb-field">
+				<label class="lb-form-label" for="m-def"><TMPL_VAR MQTT.DEFAULT></label>
+				<div class="kb-unit"><input class="lb-input" id="m-def" type="number" min="5" step="1"><span><TMPL_VAR COMMON.SECONDS></span></div>
+				<p class="lb-form-help"><TMPL_VAR MQTT.DEFAULT_HELP></p>
+			</div>
+			<div class="kb-field">
+				<label class="lb-form-label" for="m-ret"><TMPL_VAR MQTT.RETAIN></label>
+				<label class="lb-toggle"><input type="checkbox" id="m-ret"><span class="lb-toggle-slider"></span></label>
+				<p class="lb-form-help"><TMPL_VAR MQTT.RETAIN_HELP></p>
+			</div>
+		</div>
+		<div class="lb-callout kb-note"><TMPL_VAR MQTT.BROKER_NOTE> <span class="kb-mono" id="m-sub"></span></div>
+	</div>
+	<div class="kb-foot">
+		<span class="kb-grow"></span>
+		<span class="kb-toast" id="m-toast" role="status"></span>
+		<button type="button" class="lb-btn lb-btn-primary lb-btn-sm" id="m-save"><i class="pi pi-save"></i> <TMPL_VAR COMMON.SAVE></button>
+	</div>
+</section>
+
+<section class="lb-card kb-card">
+	<div class="kb-head"><h3><TMPL_VAR MQTT.SCHEMA></h3></div>
+	<div class="lb-table-scroll">
+		<table class="lb-table kb-table">
+			<thead><tr><th><TMPL_VAR MQTT.COL_TOPIC></th><th><TMPL_VAR MQTT.COL_DIR></th><th><TMPL_VAR MQTT.COL_CONTENT></th></tr></thead>
+			<tbody id="m-schema"></tbody>
+		</table>
+	</div>
+</section>
+
+<section class="lb-card kb-card">
+	<div class="kb-head">
+		<h3><TMPL_VAR MQTT.ACTIVE></h3>
+		<div class="kb-seg" id="m-boxes" role="group" aria-label="<TMPL_VAR COMMON.PICK_BOX>"></div>
+	</div>
+	<div class="lb-table-scroll">
+		<table class="lb-table kb-table">
+			<thead><tr><th><TMPL_VAR MQTT.COL_OP></th><th><TMPL_VAR MQTT.COL_TOPIC></th><th><TMPL_VAR MQTT.COL_CYCLE></th><th><TMPL_VAR MQTT.COL_ORIGIN></th><th></th></tr></thead>
+			<tbody id="m-ops"><tr><td colspan="5" class="kb-muted"><TMPL_VAR COMMON.LOADING></td></tr></tbody>
+		</table>
+	</div>
+	<div class="kb-foot">
+		<span class="kb-sub kb-grow"><TMPL_VAR MQTT.CORE_NOTE></span>
+		<span class="kb-toast" id="m-ops-toast" role="status"></span>
+		<a class="lb-btn lb-btn-sm" id="m-more" href="index.cgi?form=docs"><TMPL_VAR MQTT.MORE></a>
+		<button type="button" class="lb-btn lb-btn-primary lb-btn-sm" id="m-ops-save"><i class="pi pi-save"></i> <TMPL_VAR COMMON.SAVE></button>
+	</div>
+</section>
+
+</div>
