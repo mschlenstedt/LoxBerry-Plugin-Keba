@@ -15,14 +15,9 @@
 				<p class="lb-form-help"><TMPL_VAR MQTT.BASE_HELP> <span class="kb-mono" id="m-base-ex"></span></p>
 			</div>
 			<div class="kb-field">
-				<label class="lb-form-label" for="m-core"><TMPL_VAR MQTT.CORE></label>
-				<div class="kb-unit"><input class="lb-input" id="m-core" type="number" min="5" step="1"><span><TMPL_VAR COMMON.SECONDS></span></div>
-				<p class="lb-form-help"><TMPL_VAR MQTT.CORE_HELP></p>
-			</div>
-			<div class="kb-field">
-				<label class="lb-form-label" for="m-def"><TMPL_VAR MQTT.DEFAULT></label>
-				<div class="kb-unit"><input class="lb-input" id="m-def" type="number" min="5" step="1"><span><TMPL_VAR COMMON.SECONDS></span></div>
-				<p class="lb-form-help"><TMPL_VAR MQTT.DEFAULT_HELP></p>
+				<label class="lb-form-label" for="m-interval"><TMPL_VAR MQTT.INTERVAL></label>
+				<div class="kb-unit"><input class="lb-input" id="m-interval" type="number" min="5" step="1"><span><TMPL_VAR COMMON.SECONDS></span></div>
+				<p class="lb-form-help"><TMPL_VAR MQTT.INTERVAL_HELP></p>
 			</div>
 			<div class="kb-field">
 				<label class="lb-form-label" for="m-ret"><TMPL_VAR MQTT.RETAIN></label>
@@ -30,7 +25,7 @@
 				<p class="lb-form-help"><TMPL_VAR MQTT.RETAIN_HELP></p>
 			</div>
 		</div>
-		<div class="lb-callout kb-note"><TMPL_VAR MQTT.BROKER_NOTE> <span class="kb-mono" id="m-sub"></span></div>
+		<div class="lb-callout kb-note"><TMPL_VAR MQTT.BROKER_NOTE></div>
 	</div>
 	<div class="kb-foot">
 		<span class="kb-grow"></span>
@@ -56,15 +51,14 @@
 	</div>
 	<div class="lb-table-scroll">
 		<table class="lb-table kb-table">
-			<thead><tr><th><TMPL_VAR MQTT.COL_OP></th><th><TMPL_VAR MQTT.COL_TOPIC></th><th><TMPL_VAR MQTT.COL_CYCLE></th><th><TMPL_VAR MQTT.COL_ORIGIN></th><th></th></tr></thead>
-			<tbody id="m-ops"><tr><td colspan="5" class="kb-muted"><TMPL_VAR COMMON.LOADING></td></tr></tbody>
+			<thead><tr><th><TMPL_VAR MQTT.COL_OP></th><th><TMPL_VAR MQTT.COL_TOPIC></th><th><TMPL_VAR MQTT.COL_CYCLE></th><th></th></tr></thead>
+			<tbody id="m-ops"><tr><td colspan="4" class="kb-muted"><TMPL_VAR COMMON.LOADING></td></tr></tbody>
 		</table>
 	</div>
 	<div class="kb-foot">
-		<span class="kb-sub kb-grow"><TMPL_VAR MQTT.CORE_NOTE></span>
+		<span class="kb-sub kb-grow"><TMPL_VAR MQTT.ACTIVE_NOTE></span>
 		<span class="kb-toast" id="m-ops-toast" role="status"></span>
 		<a class="lb-btn lb-btn-sm" id="m-more" href="index.cgi?form=docs"><TMPL_VAR MQTT.MORE></a>
-		<button type="button" class="lb-btn lb-btn-primary lb-btn-sm" id="m-ops-save"><i class="pi pi-save"></i> <TMPL_VAR COMMON.SAVE></button>
 	</div>
 </section>
 

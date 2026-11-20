@@ -239,7 +239,7 @@ function boxCard(id, b, username) {
 		+ kv('OVERVIEW.LOGIN', login)
 		+ kv('OVERVIEW.ACCESS', access)
 		+ kv('OVERVIEW.REFRESH', refresh)
-		+ kv('OVERVIEW.ENDPOINTS', esc(tf('OVERVIEW.ENDPOINTS_V', b.op_count ? 5 : 0, b.enabled_count || 0)))
+		+ kv('OVERVIEW.ENDPOINTS', esc(tf('OVERVIEW.ENDPOINTS_V', b.enabled_count || 0, b.op_count || 0)))
 		+ kv('OVERVIEW.LAST_POLL', esc(ago(b.last_poll)))
 		+ kv('OVERVIEW.LAST_UDP', esc(b.last_udp ? ago(b.last_udp) : t('OVERVIEW.NONE_SINCE_START')))
 		+ '</dl>';
@@ -296,9 +296,9 @@ function initSettings() {
 		$('f-name').value = box ? box.name : '';
 		$('f-host').value = box ? box.host : '';
 		$('f-user').value = box ? (box.username || 'admin') : 'admin';
-		$('f-pw').value = '';
-		$('f-pw').placeholder = box && box.password_set ? '••••••••' : '';
-		$('f-pw-help').textContent = t(box && box.password_set ? 'SETTINGS.F_PW_KEEP' : 'SETTINGS.F_PW_HELP');
+		$('f-pw').value = box ? (box.password || '') : '';
+		$('f-pw').type = 'password';
+		$('f-pw-eye').innerHTML = '<i class="pi pi-eye"></i>';
 		$('f-active').checked = box ? !!box.active : true;
 		$('f-delete').hidden = !box;
 		$('f-delete').querySelector('span').textContent = t('SETTINGS.DELETE');
@@ -333,11 +333,12 @@ function initSettings() {
 	};
 	$('st-add').onclick = function () { openForm(null); };
 	$('f-cancel').onclick = function () { editing = null; $('st-form').hidden = true; renderTable(); };
-	$('f-pw-eye').onclick = function () {
-		var pw = $('f-pw'), show = pw.type === 'password';
-		pw.type = show ? 'text' : 'password';
-		this.innerHTML = '<i class="pi ' + (show ? 'pi-eye-slash' : 'pi-eye') + '"></i>';
-	};
+	$('f-pw-eye').addEventListener('click', function (ev) {
+		ev.preventDefault();
+		var pw = $('f-pw'), show = pw.getAttribute('type') === 'password';
+		pw.setAttribute('type', show ? 'text' : 'password');
+		$('f-pw-eye').innerHTML = '<i class="pi ' + (show ? 'pi-eye-slash' : 'pi-eye') + '"></i>';
+	});
 	$('f-check').onclick = function () {
 		var d = formData();
 		if (!d.host) { toast($('f-toast'), t('SETTINGS.ERR_HOST'), true); return; }
@@ -352,7 +353,7 @@ function initSettings() {
 	$('f-save').onclick = function () {
 		var d = formData();
 		if (!d.host) { toast($('f-toast'), t('SETTINGS.ERR_HOST'), true); return; }
-		if (!d.password && !(editing && editing.password_set)) { toast($('f-toast'), t('SETTINGS.ERR_PW'), true); return; }
+		if (!d.password) { toast($('f-toast'), t('SETTINGS.ERR_PW'), true); return; }
 		toast($('f-toast'), t('SETTINGS.SAVING'));
 		var btn = this;
 		btn.disabled = true;
@@ -362,7 +363,7 @@ function initSettings() {
 			toast($('f-toast'), t(r.serial ? 'COMMON.SAVED' : 'SETTINGS.SAVED_NOSERIAL'));
 			return load().then(function () {
 				var box = cfg.boxes.filter(function (b) { return b.id === r.id; })[0];
-				if (box) { editing = box; $('f-delete').hidden = false; $('f-pw').value = ''; $('f-pw').placeholder = '••••••••'; renderTable(); }
+				if (box) { editing = box; $('f-delete').hidden = false; renderTable(); }
 			});
 		}).catch(function (e) { toast($('f-toast'), e.message, true); }).then(function () { btn.disabled = false; });
 	};
@@ -395,7 +396,6 @@ function initMqtt() {
 	function renderSchema() {
 		var base = cfg.mqtt.base_topic;
 		$('m-base-ex').textContent = base + '/<' + t('SETTINGS.COL_SERIAL').toLowerCase() + '>/…';
-		$('m-sub').textContent = base + '/#';
 		var rows = [
 			[base + '/gateway', 'out', 'MQTT.S_GATEWAY'],
 			[base + '/<sn>/status', 'out', 'MQTT.S_STATUS'],
@@ -416,8 +416,7 @@ function initMqtt() {
 
 	function fillForm() {
 		$('m-base').value = cfg.mqtt.base_topic;
-		$('m-core').value = cfg.mqtt.core_interval;
-		$('m-def').value = cfg.mqtt.default_interval;
+		$('m-interval').value = cfg.mqtt.interval;
 		$('m-ret').checked = !!cfg.mqtt.retain;
 	}
 
@@ -428,10 +427,10 @@ function initMqtt() {
 		var box = cfg.boxes.filter(function (b) { return b.id === id; })[0] || {};
 		serial = box.serial || '';
 		$('m-more').href = 'index.cgi?form=docs&box=' + encodeURIComponent(id);
-		$('m-ops').innerHTML = '<tr><td colspan="5" class="kb-muted">' + esc(t('COMMON.LOADING')) + '</td></tr>';
+		$('m-ops').innerHTML = '<tr><td colspan="4" class="kb-muted">' + esc(t('COMMON.LOADING')) + '</td></tr>';
 		ajax('getoperations', { id: id }).then(function (r) {
 			if (!r.ok) {
-				$('m-ops').innerHTML = '<tr><td colspan="5" class="kb-muted">' + esc(t('MQTT.NO_OPS')) + '</td></tr>';
+				$('m-ops').innerHTML = '<tr><td colspan="4" class="kb-muted">' + esc(t('MQTT.NO_OPS')) + '</td></tr>';
 				return;
 			}
 			serial = r.serial || serial;
@@ -441,33 +440,21 @@ function initMqtt() {
 
 	function renderOps(ops) {
 		var base = cfg.mqtt.base_topic, rows = [];
-		var shown = ops.filter(function (o) { return o.status === 'core' || o.status === 'enabled' || o.status === 'missing'; });
-		shown.sort(function (a, b) {
-			var order = { core: 0, enabled: 1, missing: 2 };
-			return (order[a.status] - order[b.status]) || a.path.localeCompare(b.path);
-		});
+		var shown = ops.filter(function (o) { return o.status === 'enabled' || o.status === 'missing'; });
+		shown.sort(function (a, b) { return (a.status === b.status ? 0 : a.status === 'enabled' ? -1 : 1) || a.path.localeCompare(b.path); });
 		shown.forEach(function (o) {
-			var cycle;
-			if (o.status === 'missing') cycle = '<span class="kb-sub-inline">–</span>';
-			else if (o.interval) {
-				cycle = o.status === 'core'
-					? esc(o.interval) + ' s'
-					: '<div class="kb-unit kb-unit-sm"><input class="lb-input" type="number" min="5" step="1" value="' + esc(o.interval)
-						+ '" data-op="' + esc(o.op) + '" data-orig="' + esc(o.interval) + '" aria-label="' + esc(t('MQTT.COL_CYCLE')) + '"><span>s</span></div>';
-			} else cycle = '<span class="kb-sub-inline">' + esc(t('COMMON.COMMAND')) + '</span>';
-			var origin = o.status === 'core' ? '<span class="kb-tag core">' + esc(t('MQTT.ORIGIN_CORE')) + '</span>'
-				: o.status === 'missing' ? '<span class="kb-tag blk">' + esc(t('MQTT.ORIGIN_MISSING')) + '</span>'
-				: '<span class="kb-tag">' + esc(t('MQTT.ORIGIN_ENABLED')) + '</span>';
-			var remove = o.status === 'core' ? '' : '<button type="button" class="kb-x" data-remove="' + esc(o.op) + '" aria-label="'
-				+ esc(t('MQTT.REMOVE')) + '" title="' + esc(t('MQTT.REMOVE')) + '"><i class="pi pi-times"></i></button>';
+			var cycle = o.status === 'missing' ? '<span class="kb-tag blk">' + esc(t('MQTT.ORIGIN_MISSING')) + '</span>'
+				: o.interval ? esc(o.interval) + ' s' : '<span class="kb-sub-inline">' + esc(t('COMMON.COMMAND')) + '</span>';
 			rows.push('<tr><td class="kb-nw">' + methodTag(o.method) + ' <span class="kb-mono">' + esc(o.path) + '</span></td>'
 				+ '<td class="kb-mono kb-nw">' + esc(o.topic ? topicFor(base, serial, o) : '–') + '</td><td class="kb-nw">' + cycle + '</td>'
-				+ '<td>' + origin + '</td><td>' + remove + '</td></tr>');
+				+ '<td><button type="button" class="kb-x" data-remove="' + esc(o.op) + '" aria-label="' + esc(t('MQTT.REMOVE'))
+				+ '" title="' + esc(t('MQTT.REMOVE')) + '"><i class="pi pi-times"></i></button></td></tr>');
 		});
+		if (!shown.length) rows.push('<tr><td colspan="4" class="kb-muted">' + esc(t('MQTT.NONE_ENABLED')) + '</td></tr>');
 		[['udp/set', 'MQTT.UDP_ANY'], ['display/set', 'MQTT.DISPLAY_TEXT']].forEach(function (u) {
 			rows.push('<tr><td class="kb-nw">' + methodTag('UDP') + ' <span class="kb-mono">' + esc(t(u[1])) + '</span></td>'
 				+ '<td class="kb-mono kb-nw">' + esc(base + '/' + (serial || '<sn>') + '/' + u[0]) + '</td>'
-				+ '<td class="kb-sub-inline">' + esc(t('COMMON.COMMAND')) + '</td><td><span class="kb-tag core">' + esc(t('MQTT.ORIGIN_CORE')) + '</span></td><td></td></tr>');
+				+ '<td class="kb-sub-inline">' + esc(t('COMMON.COMMAND')) + '</td><td></td></tr>');
 		});
 		$('m-ops').innerHTML = rows.join('');
 	}
@@ -480,26 +467,9 @@ function initMqtt() {
 			loadOps(boxId);
 		}).catch(function (e) { toast($('m-ops-toast'), e.message, true); });
 	};
-	$('m-ops-save').onclick = function () {
-		var inputs = Array.prototype.slice.call($('m-ops').querySelectorAll('input[data-op]'))
-			.filter(function (i) { return i.value !== i.getAttribute('data-orig'); });
-		var chain = Promise.resolve(), failed = null;
-		inputs.forEach(function (i) {
-			chain = chain.then(function () {
-				return ajax('setop', { id: boxId, op: i.getAttribute('data-op'), enabled: 1, interval: i.value }).then(function (r) {
-					if (!r.ok) failed = r.error;
-				});
-			});
-		});
-		chain.then(function () {
-			if (failed) toast($('m-ops-toast'), failed, true);
-			else toast($('m-ops-toast'), t('COMMON.SAVED'));
-			loadOps(boxId);
-		}).catch(function (e) { toast($('m-ops-toast'), e.message, true); });
-	};
 	$('m-save').onclick = function () {
-		ajax('savemqtt', { base_topic: $('m-base').value.trim(), core_interval: $('m-core').value,
-			default_interval: $('m-def').value, retain: $('m-ret').checked }).then(function (r) {
+		ajax('savemqtt', { base_topic: $('m-base').value.trim(), interval: $('m-interval').value,
+			retain: $('m-ret').checked }).then(function (r) {
 			if (!r.ok) { toast($('m-toast'), r.error || t('COMMON.ERROR'), true); return; }
 			cfg.mqtt = r.mqtt;
 			fillForm();
@@ -515,7 +485,7 @@ function initMqtt() {
 		fillForm();
 		renderSchema();
 		if (!cfg.boxes.length) {
-			$('m-ops').innerHTML = '<tr><td colspan="5" class="kb-muted">' + esc(t('COMMON.NO_BOXES')) + '</td></tr>';
+			$('m-ops').innerHTML = '<tr><td colspan="4" class="kb-muted">' + esc(t('COMMON.NO_BOXES')) + '</td></tr>';
 			return;
 		}
 		var first = PARAMS.get('box') || cfg.boxes[0].id;
@@ -549,9 +519,9 @@ function initDocs() {
 	}
 
 	function renderChips() {
-		var counts = { all: data.ops.length, core: 0, enabled: 0, available: 0, blocked: 0, missing: 0 };
+		var counts = { all: data.ops.length, enabled: 0, available: 0, blocked: 0, missing: 0 };
 		data.ops.forEach(function (o) { counts[o.status] = (counts[o.status] || 0) + 1; });
-		var chips = [['all', 'DOCS.F_ALL'], ['core', 'DOCS.F_CORE'], ['enabled', 'DOCS.F_ENABLED'],
+		var chips = [['all', 'DOCS.F_ALL'], ['enabled', 'DOCS.F_ENABLED'],
 			['available', 'DOCS.F_AVAILABLE'], ['blocked', 'DOCS.F_BLOCKED']];
 		if (counts.missing) chips.push(['missing', 'DOCS.F_MISSING']);
 		$('d-chips').innerHTML = chips.map(function (c) {
@@ -561,7 +531,6 @@ function initDocs() {
 	}
 
 	function statusCell(o) {
-		if (o.status === 'core') return '<span class="kb-tag core">' + esc(t('DOCS.TAG_CORE')) + '</span>';
 		if (o.status === 'blocked') return '<span class="kb-tag blk" title="' + esc(o.block_reason) + '">' + esc(t('DOCS.TAG_BLOCKED')) + '</span>';
 		var label = t(o.method === 'GET' && o.pollable ? 'DOCS.CHK_POLL' : 'DOCS.CHK_CMD');
 		var html = '<label class="kb-chk"><input type="checkbox" data-op="' + esc(o.op) + '"' + (o.status === 'enabled' || o.status === 'missing' ? ' checked' : '')

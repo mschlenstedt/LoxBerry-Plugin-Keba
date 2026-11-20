@@ -27,6 +27,16 @@ my $FOLDER       = $lbpplugindir;
 $FOLDER =~ s{.*/}{};
 my $DAEMON       = "$lbhomedir/system/daemons/plugins/$FOLDER";
 my $MIN_INTERVAL = 5;
+my $DEFAULT_INTERVAL = 60;
+my $CONFIG_VERSION = 2;
+# Beim Anlegen einer Box vorausgewählt (gleiche Liste wie DEFAULT_OPS in keba_openapi.py).
+my @DEFAULT_OPS = (
+    'GET /v2/wallboxes/{serialNumber}',
+    'POST /v2/wallboxes/{serialNumber}/start-charging',
+    'POST /v2/wallboxes/{serialNumber}/stop-charging',
+    'POST /v2/wallboxes/{serialNumber}/change-availability',
+    'POST /v2/wallboxes/{serialNumber}/unlock',
+);
 
 my $JSON = JSON::PP->new->utf8->canonical;
 
@@ -119,11 +129,13 @@ sub read_cfg {
     my $cfg = read_json_file($CFG_FILE) // {};
     $cfg = {} unless ref $cfg eq 'HASH';
     my $m = ref $cfg->{mqtt} eq 'HASH' ? $cfg->{mqtt} : {};
+    my $version = ($cfg->{version} // 1) =~ /^\d+$/ ? $cfg->{version} : 1;
+    my $interval = ($m->{interval} // '') =~ /^\d+$/ ? $m->{interval} : $DEFAULT_INTERVAL;
+    $interval = $MIN_INTERVAL if $interval < $MIN_INTERVAL;
     $cfg->{mqtt} = {
-        base_topic       => (defined $m->{base_topic} && $m->{base_topic} ne '') ? $m->{base_topic} : 'keba',
-        core_interval    => int($m->{core_interval} // 10),
-        default_interval => int($m->{default_interval} // 60),
-        retain           => (!defined $m->{retain} || $m->{retain}) ? JSON::PP::true : JSON::PP::false,
+        base_topic => (defined $m->{base_topic} && $m->{base_topic} ne '') ? $m->{base_topic} : 'keba',
+        interval   => int($interval),
+        retain     => (!defined $m->{retain} || $m->{retain}) ? JSON::PP::true : JSON::PP::false,
     };
     my @boxes;
     for my $b (@{ ref $cfg->{boxes} eq 'ARRAY' ? $cfg->{boxes} : [] }) {
@@ -131,8 +143,12 @@ sub read_cfg {
         my @enabled;
         for my $e (@{ ref $b->{enabled} eq 'ARRAY' ? $b->{enabled} : [] }) {
             next unless ref $e eq 'HASH' && defined $e->{op} && $e->{op} ne '';
-            push @enabled, { op => "$e->{op}",
-                             interval => defined $e->{interval} ? int($e->{interval}) : undef };
+            push @enabled, { op => "$e->{op}" };
+        }
+        if ($version < 2) {
+            # Bis Version 1 waren die Kern-Endpunkte immer aktiv: als freigeschaltet übernehmen.
+            my %have = map { $_->{op} => 1 } @enabled;
+            @enabled = ((map { { op => $_ } } grep { !$have{$_} } @DEFAULT_OPS), @enabled);
         }
         push @boxes, {
             id       => "$b->{id}",
@@ -146,13 +162,14 @@ sub read_cfg {
         };
     }
     $cfg->{boxes} = \@boxes;
+    $cfg->{version} = $CONFIG_VERSION;
     return $cfg;
 }
 
 # Atomar schreiben, Modus 600 (die Datei enthält Passwörter).
 sub write_cfg {
     my ($cfg) = @_;
-    my $data = JSON::PP->new->utf8->canonical->pretty->encode({ mqtt => $cfg->{mqtt}, boxes => $cfg->{boxes} });
+    my $data = JSON::PP->new->utf8->canonical->pretty->encode({ version => $CONFIG_VERSION + 0, mqtt => $cfg->{mqtt}, boxes => $cfg->{boxes} });
     my ($fh, $tmp) = tempfile('.pluginconfig.XXXXXX', DIR => dirname($CFG_FILE));
     binmode $fh;
     print $fh $data;
@@ -254,11 +271,8 @@ sub action_stop {
 }
 
 sub action_getconfig {
+    # Passwörter gehen an die WebUI (htmlauth), damit sie im Formular bearbeitet werden können.
     my $cfg = read_cfg();
-    for my $b (@{ $cfg->{boxes} }) {
-        $b->{password_set} = $b->{password} ne '' ? JSON::PP::true : JSON::PP::false;
-        delete $b->{password};
-    }
     return { ok => JSON::PP::true, mqtt => $cfg->{mqtt}, boxes => $cfg->{boxes} };
 }
 
@@ -305,7 +319,8 @@ sub action_savebox {
         my %used = map { $_->{id} => 1 } @{ $cfg->{boxes} };
         my $n = 1;
         $n++ while $used{"b$n"};
-        $box = { id => "b$n", serial => '', enabled => [], password => '' };
+        $box = { id => "b$n", serial => '', password => '',
+                 enabled => [ map { { op => $_ } } @DEFAULT_OPS ] };
         push @{ $cfg->{boxes} }, $box;
     }
     if ($password eq '') {
@@ -355,16 +370,12 @@ sub action_savemqtt {
     $base =~ s{^/+|/+$}{}g;
     return fail('Basis-Topic ungültig (keine Leerzeichen, # oder +)')
         if $base eq '' || $base =~ m{[\s#+]} || length($base) > 100;
-    my %iv;
-    for my $k (qw(core_interval default_interval)) {
-        my $v = param($k, $cfg->{mqtt}{$k});
-        return fail("$k muss eine ganze Zahl sein") unless "$v" =~ /^\d+$/;
-        return fail("$k mindestens $MIN_INTERVAL s") if $v < $MIN_INTERVAL;
-        $iv{$k} = int($v);
-    }
+    my $iv = param('interval', $cfg->{mqtt}{interval});
+    return fail('Abfragezyklus muss eine ganze Zahl sein') unless "$iv" =~ /^\d+$/;
+    return fail("Abfragezyklus mindestens $MIN_INTERVAL s") if $iv < $MIN_INTERVAL;
     my $retain = param('retain', $cfg->{mqtt}{retain} ? '1' : '0');
     $cfg->{mqtt} = {
-        base_topic => $base, %iv,
+        base_topic => $base, interval => int($iv),
         retain => ($retain eq '0' || $retain eq 'false') ? JSON::PP::false : JSON::PP::true,
     };
     write_cfg($cfg) or return fail('Konfiguration konnte nicht gespeichert werden');
@@ -384,25 +395,19 @@ sub action_setop {
     my $id       = param('id', '');
     my $op       = param('op', '');
     my $enabled  = param('enabled', '1');
-    my $interval = param('interval', '');
     my $cfg = read_cfg();
     my $box = find_box($cfg, $id) or return fail('Box nicht gefunden');
     return fail('Operation fehlt') if $op eq '';
     my $on = !($enabled eq '0' || $enabled eq 'false');
-    if ($interval ne '') {
-        return fail('Zyklus muss eine ganze Zahl sein') unless $interval =~ /^\d+$/;
-        return fail("Zyklus mindestens $MIN_INTERVAL s") if $interval < $MIN_INTERVAL;
-    }
     if ($on) {
         my $ops = run_cli('', 'operations', '--box-id', $id);
         return fail($ops->{error}) if $ops->{error};
         my ($found) = grep { $_->{op} eq $op } @{ $ops->{ops} || [] };
         return fail('Operation in dieser Firmware unbekannt') unless $found;
         return fail("Gesperrt: $found->{block_reason}") if $found->{status} eq 'blocked';
-        return fail('Kern-Operation ist immer aktiv') if $found->{status} eq 'core';
     }
     my @enabled = grep { $_->{op} ne $op } @{ $box->{enabled} };
-    push @enabled, { op => $op, interval => ($interval ne '' ? int($interval) : undef) } if $on;
+    push @enabled, { op => $op } if $on;
     $box->{enabled} = \@enabled;
     write_cfg($cfg) or return fail('Konfiguration konnte nicht gespeichert werden');
     reload_gateway();

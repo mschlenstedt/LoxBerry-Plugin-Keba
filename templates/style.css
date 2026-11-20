@@ -7,7 +7,7 @@
 .kb-page { display: grid; gap: 16px; }
 .kb-title { margin: 0; font-size: 20px; font-weight: 600; color: var(--lb-text); }
 .kb-gap { margin-top: 12px; }
-.kb-lead { margin: -10px 0 4px; color: var(--lb-text-secondary); font-size: 14px; max-width: 80ch; }
+.kb-lead { margin: -10px 0 4px; color: var(--lb-text-secondary); font-size: 14px; }
 .kb-lead a { color: var(--lb-primary); }
 .kb-mono { font-family: Consolas, Monaco, monospace; font-size: 13px; }
 .kb-sub { display: block; font-size: 12.5px; color: var(--lb-text-muted); margin: 0; }
@@ -76,7 +76,8 @@
    lb-form-help um die Labelbreite ein – hier stehen Label und Hilfe über/unter dem Feld. */
 .kb-field .lb-form-label { font-weight: 600; width: auto !important; min-width: 0 !important; text-align: left !important; }
 .kb-field .lb-form-help { margin: 0 !important; padding-left: 0 !important; }
-.kb-field > .lb-toggle { align-self: flex-start; }
+/* Im Flex-Container würde der Schalter in der Höhe gestaucht (Knopf ragt heraus). */
+.kb-field > .lb-toggle { flex: none; align-self: flex-start; }
 .kb-pw { display: flex; gap: 6px; align-items: center; }
 .kb-pw .lb-input { flex: 1 1 auto; min-width: 0; }
 .kb-pw .lb-btn { flex: none; margin: 0 !important; }

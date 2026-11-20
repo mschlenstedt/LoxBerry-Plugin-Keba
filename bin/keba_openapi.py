@@ -1,7 +1,7 @@
 """Endpunktmodell aus der openapi.json einer KEBA-Box.
 
 Jede Operation (METHODE Pfad) wird ein Operation-Eintrag mit MQTT-Topic, Status
-(core/available/blocked) und den aufgelösten Schemas für Doku und Prüfung.
+(available/blocked) und den aufgelösten Schemas für Doku und Prüfung.
 """
 import re
 from dataclasses import dataclass, field
@@ -9,13 +9,14 @@ from dataclasses import dataclass, field
 METHODS = ("get", "post", "put", "patch", "delete")
 SERIAL_PARAMS = ("serialnumber", "serial")
 
-CORE_OPS = frozenset({
+# Beim Anlegen einer Box vorausgewählt; danach frei ab- und zuschaltbar wie jeder andere Endpunkt.
+DEFAULT_OPS = (
     "GET /v2/wallboxes/{serialNumber}",
     "POST /v2/wallboxes/{serialNumber}/start-charging",
     "POST /v2/wallboxes/{serialNumber}/stop-charging",
     "POST /v2/wallboxes/{serialNumber}/change-availability",
     "POST /v2/wallboxes/{serialNumber}/unlock",
-})
+)
 
 _DANGER = "gefährlich"
 _EXPORT = "teurer Export"
@@ -170,7 +171,7 @@ def parse_openapi(spec: dict) -> list[Operation]:
             key = f"{m} {path}"
             topic = derive_topic(path)
             reason = block_reason(m, path) or ("" if topic else "kein Datenendpunkt")
-            status = "blocked" if reason else ("core" if key in CORE_OPS else "available")
+            status = "blocked" if reason else "available"
             pollable = (m == "GET" and not reason and not path_params
                         and not any(q["required"] for q in query_params))
             tags = o.get("tags") or []
@@ -207,8 +208,8 @@ def _dedupe_topics(ops: list[Operation]) -> None:
 
 
 def op_status(op: Operation, enabled: set[str]) -> str:
-    if op.base_status in ("core", "blocked"):
-        return op.base_status
+    if op.base_status == "blocked":
+        return "blocked"
     return "enabled" if op.op in enabled else "available"
 
 

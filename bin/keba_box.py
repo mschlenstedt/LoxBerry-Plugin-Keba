@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Awaitable, Callable
 
 from keba_config import BoxConfig, MqttConfig
-from keba_openapi import CORE_OPS, Operation, missing_enabled, op_status, parse_openapi, validate
+from keba_openapi import Operation, missing_enabled, op_status, parse_openapi, validate
 from keba_rest import Backoff, KebaRest, RestError
 from keba_udp import UdpHub, display_command, parse_report, validate_udp_command
 
@@ -32,14 +32,9 @@ SERIAL_RE = re.compile(r"[A-Za-z0-9_-]{1,32}")   # landet in Pfaden, Topics und 
 def describe_operations(ops: list[Operation], enabled_ops: list, mqtt: MqttConfig) -> list[dict]:
     """Endpunktliste für Doku und WebUI, inklusive freigeschalteter, aber unbekannter Einträge."""
     enabled = {e.op for e in enabled_ops}
-    intervals = {e.op: e.interval for e in enabled_ops}
     out = []
     for o in ops:
-        interval = None
-        if o.pollable and o.op == CORE_GET:
-            interval = mqtt.core_interval
-        elif o.pollable and o.op in enabled:
-            interval = intervals.get(o.op) or mqtt.default_interval
+        interval = mqtt.interval if o.pollable and o.op in enabled else None
         out.append({
             "op": o.op, "method": o.method, "path": o.path, "tag": o.tag,
             "summary": o.summary, "description": o.description, "topic": o.topic,
@@ -97,12 +92,7 @@ class BoxWorker:
         return [e.op for e in self.box.enabled]
 
     def _interval(self, op: str) -> int:
-        if op == CORE_GET:
-            return self.mqtt.core_interval
-        for e in self.box.enabled:
-            if e.op == op:
-                return e.interval or self.mqtt.default_interval
-        return self.mqtt.default_interval
+        return self.mqtt.interval
 
     def _find(self, topic: str, method: str) -> Operation | None:
         for o in self.ops:
@@ -213,7 +203,7 @@ class BoxWorker:
         self._stopped.set()
 
     async def _poll_due(self, now: float) -> None:
-        targets = [CORE_GET] + [e for e in self.enabled if e != CORE_GET]
+        targets = self.enabled
         for key in targets:
             op = next((o for o in self.ops if o.op == key), None)
             if op is None or not op.pollable or op_status(op, set(self.enabled)) == "blocked":
@@ -342,7 +332,7 @@ class BoxWorker:
         if op is None:
             await self._pub(reply, _result(False, error="unknown operation"))
             return
-        if op_status(op, set(self.enabled)) not in ("core", "enabled"):
+        if op_status(op, set(self.enabled)) != "enabled":
             await self._pub(reply, _result(False, error="not enabled"))
             return
         if op.body_content_type and op.body_content_type != "application/json":

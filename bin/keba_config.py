@@ -10,6 +10,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 MIN_INTERVAL = 5
+DEFAULT_INTERVAL = 60
+CONFIG_VERSION = 2   # 2: ein gemeinsamer Abfragezyklus, keine festen Kern-Endpunkte mehr
 
 
 class ConfigError(Exception):
@@ -19,15 +21,13 @@ class ConfigError(Exception):
 @dataclass
 class MqttConfig:
     base_topic: str = "keba"
-    core_interval: int = 10
-    default_interval: int = 60
+    interval: int = DEFAULT_INTERVAL
     retain: bool = True
 
 
 @dataclass
 class EnabledOp:
     op: str
-    interval: int | None = None
 
 
 @dataclass
@@ -46,6 +46,7 @@ class BoxConfig:
 class Config:
     mqtt: MqttConfig = field(default_factory=MqttConfig)
     boxes: list[BoxConfig] = field(default_factory=list)
+    version: int = CONFIG_VERSION
 
 
 def _interval(value, default):
@@ -61,8 +62,7 @@ def _box(raw: dict) -> BoxConfig:
     for e in raw.get("enabled") or []:
         if not isinstance(e, dict) or not e.get("op"):
             continue
-        iv = e.get("interval")
-        enabled.append(EnabledOp(str(e["op"]), None if iv is None else _interval(iv, None)))
+        enabled.append(EnabledOp(str(e["op"])))
     return BoxConfig(
         id=str(raw.get("id", "")),
         name=str(raw.get("name", "")),
@@ -89,12 +89,21 @@ def load_config(path: Path) -> Config:
     d = MqttConfig()
     mqtt = MqttConfig(
         base_topic=str(m.get("base_topic") or d.base_topic).strip("/"),
-        core_interval=_interval(m.get("core_interval"), d.core_interval),
-        default_interval=_interval(m.get("default_interval"), d.default_interval),
+        interval=_interval(m.get("interval"), d.interval),
         retain=bool(m.get("retain", d.retain)),
     )
     boxes = [_box(b) for b in raw.get("boxes") or [] if isinstance(b, dict)]
-    return Config(mqtt=mqtt, boxes=boxes)
+    try:
+        version = int(raw.get("version", 1))
+    except (TypeError, ValueError):
+        version = 1
+    if version < 2:
+        # Bis Version 1 waren die Kern-Endpunkte immer aktiv: als freigeschaltet übernehmen.
+        from keba_openapi import DEFAULT_OPS
+        for b in boxes:
+            have = {e.op for e in b.enabled}
+            b.enabled = [EnabledOp(op) for op in DEFAULT_OPS if op not in have] + b.enabled
+    return Config(mqtt=mqtt, boxes=boxes, version=CONFIG_VERSION)
 
 
 def save_config(path: Path, cfg: Config) -> None:
