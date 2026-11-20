@@ -1,0 +1,4 @@
+{
+  "mqtt": { "base_topic": "keba", "core_interval": 10, "default_interval": 60, "retain": true },
+  "boxes": []
+}
