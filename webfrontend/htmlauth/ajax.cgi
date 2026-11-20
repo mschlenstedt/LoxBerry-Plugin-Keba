@@ -12,6 +12,7 @@ use Symbol qw(gensym);
 use Encode qw(decode);
 use File::Temp qw(tempfile);
 use File::Basename qw(dirname);
+use Fcntl qw(:flock);
 use LoxBerry::System;
 
 my $cgi    = CGI->new;
@@ -45,9 +46,13 @@ my %actions = (
     diag           => \&action_diag,
 );
 
+# Aktionen, die die Config lesen und wieder schreiben, laufen unter einer gemeinsamen Sperre
+# (auch der Gateway nimmt sie beim Übernehmen einer Seriennummer).
+my %writes = map { $_ => 1 } qw(savebox deletebox savemqtt setop);
+
 print $cgi->header(-type => 'application/json', -charset => 'UTF-8');
 if (my $handler = $actions{$action}) {
-    my $result = eval { $handler->() };
+    my $result = $writes{$action} ? eval { with_cfg_lock($handler) } : eval { $handler->() };
     $result = { ok => JSON::PP::false, error => "Interner Fehler: $@" } if $@;
     print $JSON->encode($result);
 } else {
@@ -66,6 +71,18 @@ sub param {
 }
 
 sub fail { return { ok => JSON::PP::false, error => $_[0] }; }
+
+sub with_cfg_lock {
+    my ($code) = @_;
+    open(my $lock, '>>', "$CFG_FILE.lock") or die "Sperrdatei: $!\n";
+    flock($lock, LOCK_EX) or die "Sperre: $!\n";
+    my $result = eval { $code->() };
+    my $err = $@;
+    flock($lock, LOCK_UN);
+    close $lock;
+    die $err if $err;
+    return $result;
+}
 
 sub read_pid {
     return undef unless -f $PID_FILE;
@@ -255,7 +272,11 @@ sub action_checkbox {
         my $box = find_box(read_cfg(), $id) or return fail('Box nicht gefunden');
         $host     = $box->{host}     if $host eq '';
         $username = $box->{username} if $username eq '';
-        $password = $box->{password} if $password eq '';
+        # Gespeichertes Passwort nur an die gespeicherte Adresse schicken.
+        if ($password eq '') {
+            return fail('Für eine neue Adresse bitte das Passwort eingeben') if $host ne $box->{host};
+            $password = $box->{password};
+        }
     }
     return fail('Ungültige Adresse') unless valid_host($host);
     my $res = run_cli(Encode::encode('UTF-8', $password), 'check', '--host', $host,
@@ -287,7 +308,11 @@ sub action_savebox {
         $box = { id => "b$n", serial => '', enabled => [], password => '' };
         push @{ $cfg->{boxes} }, $box;
     }
-    $password = $box->{password} if $password eq '';
+    if ($password eq '') {
+        return fail('Für eine neue Adresse bitte das Passwort eingeben')
+            if ($box->{host} // '') ne '' && $host ne $box->{host};
+        $password = $box->{password};
+    }
     return fail('Passwort fehlt') if $password eq '';
 
     my $check = run_cli(Encode::encode('UTF-8', $password), 'check', '--host', $host,

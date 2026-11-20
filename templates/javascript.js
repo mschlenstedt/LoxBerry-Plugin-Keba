@@ -421,7 +421,7 @@ function initMqtt() {
 		$('m-ret').checked = !!cfg.mqtt.retain;
 	}
 
-	function methodTag(m) { return '<span class="kb-m ' + m.toLowerCase() + '">' + esc(m) + '</span>'; }
+	function methodTag(m) { return '<span class="kb-m ' + esc(m.toLowerCase()) + '">' + esc(m) + '</span>'; }
 
 	function loadOps(id) {
 		boxId = id;
@@ -658,7 +658,9 @@ function initDocs() {
 		var box = ev.target.closest('input[data-op]');
 		if (!box) return;
 		var op = box.getAttribute('data-op'), on = box.checked;
-		box.disabled = true;
+		// Alle Haken sperren, bis die Config geschrieben ist (sonst parallele Schreibzugriffe)
+		var all = Array.prototype.slice.call($('d-rows').querySelectorAll('input[data-op]'));
+		all.forEach(function (i) { i.disabled = true; });
 		ajax('setop', { id: boxId, op: op, enabled: on ? 1 : 0 }).then(function (r) {
 			if (!r.ok) { box.checked = !on; showError(r.error); return; }
 			showError('');
@@ -667,7 +669,9 @@ function initDocs() {
 			renderChips();
 			renderRows();
 		}).catch(function (e) { box.checked = !on; showError(e.message); })
-			.then(function () { box.disabled = false; });
+			.then(function () {
+				Array.prototype.forEach.call($('d-rows').querySelectorAll('input[data-op]'), function (i) { i.disabled = false; });
+			});
 	};
 	$('d-refresh').onclick = function () {
 		var btn = this;

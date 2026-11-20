@@ -6,6 +6,8 @@ Gestartet von daemon/daemon.sh bzw. ajax.cgi über die Perl→Python-Log-Brücke
 """
 import argparse
 import asyncio
+import contextlib
+import fcntl
 import json
 import logging
 import logging.handlers
@@ -18,7 +20,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from keba_config import BoxConfig, Config, ConfigError, MqttConfig, load_config
+from keba_config import BoxConfig, Config, ConfigError, MqttConfig, load_config, save_config
 
 log = logging.getLogger("keba.gateway")
 
@@ -57,7 +59,19 @@ def default_worker_factory(gw: "Gateway", box: BoxConfig, mqtt: MqttConfig):
     from keba_rest import KebaRest
 
     rest = KebaRest(box.host, box.username, box.password, gw.session)
-    return BoxWorker(box, mqtt, rest, gw.hub, lambda t, p, r: gw.publish(t, p, r), gw.shmdir)
+    return BoxWorker(box, mqtt, rest, gw.hub, lambda t, p, r: gw.publish(t, p, r), gw.shmdir,
+                     on_serial=lambda serial: gw.remember_serial(box.id, serial))
+
+
+@contextlib.contextmanager
+def config_lock(configdir: Path):
+    """Dieselbe Sperre wie ajax.cgi (flock auf pluginconfig.json.lock) für Lesen+Schreiben."""
+    with open(Path(configdir) / "pluginconfig.json.lock", "a") as fh:
+        fcntl.flock(fh, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(fh, fcntl.LOCK_UN)
 
 
 class Gateway:
@@ -99,6 +113,27 @@ class Gateway:
             if box_id not in self.workers:
                 self._start_worker(b)
         log.info("Konfiguration geladen: %d Box(en) aktiv", len(self.workers))
+
+    def remember_serial(self, box_id: str, serial: str) -> None:
+        """Von der Box gelernte Seriennummer einmalig in die Config übernehmen (nur wenn leer)."""
+        path = self.configdir / "pluginconfig.json"
+        try:
+            with config_lock(self.configdir):
+                cfg = load_config(path)
+                box = next((b for b in cfg.boxes if b.id == box_id), None)
+                if box is None or box.serial:
+                    return
+                box.serial = serial
+                save_config(path, cfg)
+        except (OSError, ConfigError) as exc:
+            log.error("Seriennummer für Box %s nicht gespeichert: %s", box_id, exc)
+            return
+        for b in self.cfg.boxes:
+            if b.id == box_id:
+                b.serial = serial
+        if box_id in self._box_cfg:
+            self._box_cfg[box_id].serial = serial
+        log.info("Seriennummer für Box %s übernommen", box_id)
 
     def _start_worker(self, box: BoxConfig) -> None:
         worker = self.worker_factory(self, box, self.cfg.mqtt)

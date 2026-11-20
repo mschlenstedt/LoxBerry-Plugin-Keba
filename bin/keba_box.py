@@ -7,6 +7,7 @@ Ein Durchlauf von `step()` erledigt alles, was zum aktuellen Zeitpunkt fällig i
 import asyncio
 import json
 import logging
+import re
 import time
 import urllib.parse
 from pathlib import Path
@@ -25,6 +26,7 @@ CORE_GET = "GET /v2/wallboxes/{serialNumber}"
 UDP_CHECK_INTERVAL = 300      # report 1 und Versionsprüfung
 UDP_RETRY_INTERVAL = 60       # report 1, solange UDP nicht antwortet
 COMMAND_METHODS = ("get", "post", "put", "patch", "delete")
+SERIAL_RE = re.compile(r"[A-Za-z0-9_-]{1,32}")   # landet in Pfaden, Topics und der Config
 
 
 def describe_operations(ops: list[Operation], enabled_ops: list, mqtt: MqttConfig) -> list[dict]:
@@ -59,10 +61,12 @@ def _result(ok: bool, status: int = 0, body=None, error: str = "") -> dict:
 
 class BoxWorker:
     def __init__(self, box: BoxConfig, mqtt: MqttConfig, rest: KebaRest, udp: UdpHub,
-                 publish: Publish, shmdir: Path, clock: Callable[[], float] = time.time):
+                 publish: Publish, shmdir: Path, clock: Callable[[], float] = time.time,
+                 on_serial: Callable[[str], None] | None = None):
         self.box, self.mqtt, self.rest, self.udp = box, mqtt, rest, udp
         self.publish, self.shmdir, self.clock = publish, Path(shmdir), clock
         self.serial = box.serial
+        self.on_serial = on_serial
         self.ops: list[Operation] = []
         self.spec: dict = {}
         self.version = ""
@@ -122,6 +126,8 @@ class BoxWorker:
             return
         try:
             serial = await self.rest.get_serial()
+            if not SERIAL_RE.fullmatch(serial):
+                raise RestError("/serialnumber: unplausible Seriennummer")
             if self.box.serial and serial != self.box.serial:
                 self.error = "serial_mismatch"
                 log.error("%s: Box meldet andere Seriennummer als konfiguriert", self.box.name)
@@ -130,6 +136,8 @@ class BoxWorker:
             if not self.serial:
                 self.serial = serial
                 self.udp.register(serial, self.box.host)
+                if self.on_serial:
+                    self.on_serial(serial)
             await self._load_openapi(await self.rest.get_version())
         except RestError as exc:
             self.error = f"setup: {exc}"
