@@ -168,7 +168,8 @@ def parse_openapi(spec: dict) -> list[Operation]:
             body, ctype = _body(o)
             resp = _response_schema(o)
             key = f"{m} {path}"
-            reason = block_reason(m, path)
+            topic = derive_topic(path)
+            reason = block_reason(m, path) or ("" if topic else "kein Datenendpunkt")
             status = "blocked" if reason else ("core" if key in CORE_OPS else "available")
             pollable = (m == "GET" and not reason and not path_params
                         and not any(q["required"] for q in query_params))
@@ -181,7 +182,7 @@ def parse_openapi(spec: dict) -> list[Operation]:
                 path_params=path_params, query_params=query_params,
                 body_schema=None if body is None else _resolve(body, spec),
                 response_schema=None if resp is None else _resolve(resp, spec),
-                topic=derive_topic(path), base_status=status, block_reason=reason,
+                topic=topic, base_status=status, block_reason=reason,
                 pollable=pollable, serial_param=serial_param, body_content_type=ctype,
             ))
     _dedupe_topics(ops)

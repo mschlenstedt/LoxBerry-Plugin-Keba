@@ -72,8 +72,11 @@
 .kb-table tr.kb-sel td { background: color-mix(in srgb, var(--lb-primary) 8%, transparent); }
 .kb-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 20px; }
 .kb-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.kb-field .lb-form-label { font-weight: 600; }
-.kb-field .lb-form-help { margin: 0; }
+/* Das DS setzt lb-form-label für Zeilenformulare auf 200 px rechtsbündig und rückt
+   lb-form-help um die Labelbreite ein – hier stehen Label und Hilfe über/unter dem Feld. */
+.kb-field .lb-form-label { font-weight: 600; width: auto !important; min-width: 0 !important; text-align: left !important; }
+.kb-field .lb-form-help { margin: 0 !important; padding-left: 0 !important; }
+.kb-field > .lb-toggle { align-self: flex-start; }
 .kb-pw { display: flex; gap: 6px; align-items: center; }
 .kb-pw .lb-input { flex: 1 1 auto; min-width: 0; }
 .kb-pw .lb-btn { flex: none; margin: 0 !important; }
