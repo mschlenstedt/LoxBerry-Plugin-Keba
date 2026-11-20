@@ -238,7 +238,8 @@ def diag(configdir: Path, shmdir: Path, logdir: Path | None) -> dict:
     serials = [b.serial for b in boxes if b.serial]
     secrets = [b.password for b in boxes] + [b.username for b in boxes if len(b.username) > 5]
     plugin_v, lb_v = _lb_versions()
-    lines = [f"KEBA-Plugin {plugin_v} · LoxBerry {lb_v} · Python {platform.python_version()}"]
+    header = f"KEBA-Plugin {plugin_v} · LoxBerry {lb_v} · Python {platform.python_version()}"
+    lines = []
     try:
         status = json.loads((Path(shmdir) / "status.json").read_text())
     except (OSError, ValueError):
@@ -271,7 +272,8 @@ def diag(configdir: Path, shmdir: Path, logdir: Path | None) -> dict:
             lines.append(f"Letzte Warnungen/Fehler ({len(problems)}):" if problems
                          else "Keine Warnungen oder Fehler im aktuellen Log.")
             lines.extend(problems)
-    return {"text": mask("\n".join(lines), serials=serials, secrets=secrets)}
+    # Kopfzeile nicht maskieren: die LoxBerry-Version sieht aus wie eine IPv4-Adresse.
+    return {"text": header + "\n" + mask("\n".join(lines), serials=serials, secrets=secrets)}
 
 
 # ---- Einstieg --------------------------------------------------------------------------------
