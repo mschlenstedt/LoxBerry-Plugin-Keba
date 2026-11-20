@@ -113,6 +113,13 @@ function boxSegment(el, boxes, current, onPick) {
 	};
 }
 
+// Knopf zur WebUI der Box (neuer Tab). Adresse ist beim Speichern auf Hostname/IP geprüft.
+function webuiButton(host) {
+	if (!host) return '';
+	return '<a class="lb-btn lb-btn-sm" href="http://' + esc(host) + '/" target="_blank" rel="noopener">'
+		+ '<i class="pi pi-external-link"></i> ' + esc(t('COMMON.OPEN_WEBUI')) + '</a>';
+}
+
 function topicFor(base, serial, op) {
 	var sn = serial || '<sn>';
 	if (op.method === 'GET' && op.pollable) return base + '/' + sn + '/' + op.topic;
@@ -248,7 +255,8 @@ function boxCard(id, b, username) {
 	}).join('');
 	var foot = '<div class="kb-foot">'
 		+ '<a class="lb-btn lb-btn-sm" href="index.cgi?form=docs&amp;box=' + encodeURIComponent(id) + '"><i class="pi pi-list"></i> ' + esc(t('OVERVIEW.LINK_DOCS')) + '</a>'
-		+ '<a class="lb-btn lb-btn-sm" href="index.cgi?form=settings&amp;edit=' + encodeURIComponent(id) + '"><i class="pi pi-pencil"></i> ' + esc(t('OVERVIEW.LINK_EDIT')) + '</a></div>';
+		+ '<a class="lb-btn lb-btn-sm" href="index.cgi?form=settings&amp;edit=' + encodeURIComponent(id) + '"><i class="pi pi-pencil"></i> ' + esc(t('OVERVIEW.LINK_EDIT')) + '</a>'
+		+ webuiButton(b.host) + '</div>';
 	return '<article class="lb-card kb-card">' + head + '<div class="kb-body">' + noteHtml + liveHtml + dl + '</div>' + foot + '</article>';
 }
 
@@ -282,7 +290,8 @@ function initSettings() {
 				+ '<td class="kb-mono">' + esc(b.host) + '</td>'
 				+ '<td>' + esc(model) + '</td><td>' + api + '</td><td>' + udp + '</td>'
 				+ '<td>' + esc(t(b.active ? 'COMMON.YES' : 'COMMON.NO')) + '</td>'
-				+ '<td><button type="button" class="lb-btn lb-btn-sm" data-edit="' + esc(b.id) + '">' + esc(t('SETTINGS.EDIT')) + '</button></td></tr>';
+				+ '<td><div class="kb-actions kb-nw"><button type="button" class="lb-btn lb-btn-sm" data-edit="' + esc(b.id) + '">' + esc(t('SETTINGS.EDIT')) + '</button>'
+				+ webuiButton(b.host) + '</div></td></tr>';
 		}).join('');
 	}
 
