@@ -70,6 +70,8 @@ class UdpHub:
         self._by_ip: dict[str, str] = {}          # ip -> serial
         self._locks: dict[str, asyncio.Lock] = {}
         self._pending: dict[str, asyncio.Future] = {}
+        self._probes: dict[str, asyncio.Future] = {}     # ip -> Future (Verbindungsprüfung)
+        self._probe_lock = asyncio.Lock()
 
     async def start(self) -> None:
         loop = asyncio.get_running_loop()
@@ -116,9 +118,29 @@ class UdpHub:
                 if self._pending.get(serial) is fut:
                     del self._pending[serial]
 
+    async def probe(self, host: str, text: str) -> str:
+        """Einmalige Anfrage an eine (noch) nicht registrierte Adresse, z. B. beim Prüfen
+        einer neuen Box. Die Antwort geht an die Prüfung, nicht an einen Worker."""
+        if self.state != "ok" or self._transport is None:
+            raise ConnectionError(f"UDP nicht verfügbar ({self.state})")
+        async with self._probe_lock:
+            fut = asyncio.get_running_loop().create_future()
+            self._probes[host] = fut
+            try:
+                self._transport.sendto(text.encode("ascii"), (host, self.box_port))
+                async with asyncio.timeout(self.timeout):
+                    return await fut
+            finally:
+                if self._probes.get(host) is fut:
+                    del self._probes[host]
+
     def _received(self, data: bytes, addr) -> None:
-        serial = self._by_ip.get(addr[0])
         text = data.decode("ascii", errors="replace")
+        probe = self._probes.get(addr[0])
+        if probe is not None and not probe.done():
+            probe.set_result(text)
+            return
+        serial = self._by_ip.get(addr[0])
         if serial is None:
             log.debug("UDP von unbekannter Adresse %s ignoriert", addr[0])
             return
