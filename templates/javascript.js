@@ -23,9 +23,107 @@ function esc(s) {
 }
 function $(id) { return document.getElementById(id); }
 
-function ajax(action, params) {
+// ---- SecurePIN ------------------------------------------------------------------------------
+// Ablauf wie im MQTT-Gateway V2 des Cores: Seite unsichtbar, PIN prüfen, PIN in sessionStorage
+// unter demselben Schlüssel wie der Core merken. ajax.cgi gibt dafür ein Sitzungs-Token aus,
+// das jeder weitere Aufruf mitschickt.
+var TOKEN = '';
+var PIN_KEY = 'securePIN';
+var locked = true;
+var started = false;
+
+function pinStored() { try { return sessionStorage.getItem(PIN_KEY) || ''; } catch (e) { return ''; } }
+function pinStore(v) {
+	try { if (v) sessionStorage.setItem(PIN_KEY, v); else sessionStorage.removeItem(PIN_KEY); } catch (e) { /* privat */ }
+}
+function fade(el, show) {
+	if (!el) return;
+	if (window.jQuery) window.jQuery(el)[show ? 'fadeIn' : 'fadeOut']();
+	else el.style.display = show ? '' : 'none';
+}
+function pinText(name) { var b = $('securepin_block'); return (b && b.getAttribute('data-' + name)) || ''; }
+function pinHint(color, text) {
+	var h = $('check_hint');
+	if (!h) return;
+	h.style.color = color;
+	h.textContent = text;
+	if (!text) h.innerHTML = '&nbsp;';
+}
+function pinError(code) {
+	return code === 3 ? pinText('locked') : code === 2 ? pinText('open') : pinText('wrong');
+}
+
+function requestToken(pin) {
+	var body = new URLSearchParams();
+	body.append('action', 'checksecpin');
+	body.append('secpin', pin);
+	return fetch('ajax.cgi', { method: 'POST', body: body, credentials: 'same-origin' })
+		.then(function (r) {
+			if (!r.ok) throw new Error(r.statusText || ('HTTP ' + r.status));
+			return r.json();
+		})
+		.then(function (d) {
+			d.error = parseInt(d.error, 10) || 0;
+			if (d.error === 0 && d.token) TOKEN = d.token;
+			else if (d.error === 0) d.error = 2;
+			return d;
+		});
+}
+
+function lockPage() {
+	if (locked) return;
+	locked = true;
+	TOKEN = '';
+	$('main_content').style.visibility = 'hidden';
+	$('securepin').value = '';
+	pinHint('', '');
+	fade($('securepin_block'), true);
+}
+
+function unlockPage() {
+	locked = false;
+	fade($('securepin_block'), false);
+	$('main_content').style.visibility = 'visible';
+	if (!started) {
+		started = true;
+		if (inits[FORM]) inits[FORM]();
+	}
+}
+
+function checkSecurePIN() {
+	var btn = $('check_securepin');
+	var pin = $('securepin').value;
+	btn.disabled = true;
+	pinHint('blue', pinText('wait'));
+	requestToken(pin).then(function (d) {
+		if (d.error !== 0) {
+			// Eine falsche gemerkte PIN nicht bei jedem Seitenaufruf erneut probieren –
+			// der Core sperrt die SecurePIN nach fünf Fehlversuchen.
+			if (pin === pinStored()) pinStore('');
+			fade($('securepin_block'), true);
+			pinHint('red', pinError(d.error));
+			return;
+		}
+		pinStore(pin);
+		pinHint('', '');
+		unlockPage();
+	}, function (e) {
+		fade($('securepin_block'), true);
+		pinHint('red', pinText('generic') + ': ' + e.message);
+	}).then(function () { btn.disabled = false; });
+}
+
+function authError() {
+	lockPage();
+	var err = new Error(t('COMMON.PIN_REQUIRED'));
+	err.kbHandled = true;
+	return err;
+}
+
+function ajax(action, params, retried) {
 	var body = new URLSearchParams();
 	body.append('action', action);
+	body.append('token', TOKEN);
 	Object.keys(params || {}).forEach(function (k) {
 		var v = params[k];
 		if (v !== undefined && v !== null) body.append(k, typeof v === 'boolean' ? (v ? '1' : '0') : String(v));
@@ -34,6 +132,19 @@ function ajax(action, params) {
 		.then(function (r) {
 			if (!r.ok) throw new Error('HTTP ' + r.status);
 			return r.json();
+		})
+		.then(function (d) {
+			if (!d || !d.auth) return d;
+			// Sitzung abgelaufen: einmal still mit der gemerkten PIN erneuern.
+			var pin = pinStored();
+			if (retried || !pin) throw authError();
+			return requestToken(pin).then(function (c) {
+				if (c.error !== 0) {
+					if (c.error === 1) pinStore('');
+					throw authError();
+				}
+				return ajax(action, params, true);
+			});
 		})
 		.catch(function (e) {
 			if (e && e.kbHandled) throw e;
@@ -706,6 +817,13 @@ function initLogfiles() {
 }
 
 var inits = { overview: initOverview, settings: initSettings, mqtt: initMqtt, docs: initDocs, logfiles: initLogfiles };
-if (inits[FORM]) inits[FORM]();
+
+$('check_securepin').addEventListener('click', checkSecurePIN);
+$('securepin').addEventListener('keydown', function (e) {
+	if (e.key === 'Enter') { e.preventDefault(); $('check_securepin').click(); }
+});
+$('securepin').value = pinStored();
+if ($('securepin').value) $('check_securepin').click();
+else fade($('securepin_block'), true);
 })();
 </script>

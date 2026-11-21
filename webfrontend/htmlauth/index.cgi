@@ -63,9 +63,21 @@ if ($form eq 'logfiles') {
     $templateout->param(LOGLIST => LoxBerry::Web::loglist_html());
 }
 
+# SecurePIN-Abfrage mit den Texten des Cores (eigene Vorlage, damit sich die COMMON-Abschnitte
+# von Core und Plugin nicht überschreiben). Der Seiteninhalt bleibt unsichtbar, bis das
+# JavaScript die PIN geprüft hat; ajax.cgi liefert ohne gültige Sitzung ohnehin nichts.
+my $pintemplate = HTML::Template->new(
+    filename          => "$lbptemplatedir/securepin.html",
+    die_on_bad_params => 0,
+);
+LoxBerry::System::readlanguage($pintemplate, undef, 1);
+
 LoxBerry::Web::lbheader("$L{'COMMON.PLUGIN_TITLE'} V$version", $WIKI, '', 'nojqm');
 print LoxBerry::Log::get_notifications_html($lbpplugindir);
 print "<style>\n" . LoxBerry::System::read_file("$lbptemplatedir/style.css") . "</style>\n";
+print $pintemplate->output();
+print qq{<div id="main_content" style="visibility:hidden">\n};
 print $templateout->output();
+print "</div>\n";
 LoxBerry::Web::lbfooter();
 exit;

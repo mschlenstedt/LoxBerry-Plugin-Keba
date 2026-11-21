@@ -1,6 +1,11 @@
 #!/usr/bin/perl
 # KEBA-Plugin: JSON-Schnittstelle für die WebUI (action=…).
-# Passwörter werden nie an den Browser zurückgegeben und nur über stdin an keba_cli.py gereicht.
+# Passwörter gehen nur über stdin an keba_cli.py.
+#
+# SecurePIN: Jede Aktion braucht ein Sitzungs-Token. Das gibt es über action=checksecpin
+# gegen die SecurePIN des LoxBerry (LoxBerry::System::check_securepin, mit der Sperre des Cores
+# nach zu vielen Fehlversuchen). Tokens liegen als Dateien im tmpfs und verfallen nach einer
+# Stunde ohne Benutzung.
 
 use strict;
 use warnings;
@@ -18,7 +23,9 @@ use LoxBerry::System;
 my $cgi    = CGI->new;
 my $action = $cgi->param('action') // '';
 
-my $SHMDIR       = '/dev/shm/keba';
+my $SHMDIR       = $ENV{KEBA_SHMDIR} || '/dev/shm/keba';
+my $SESSION_DIR  = "$SHMDIR/webui";
+my $SESSION_TTL  = 3600;
 my $PID_FILE     = '/dev/shm/keba_gateway.pid';
 my $CFG_FILE     = "$lbpconfigdir/pluginconfig.json";
 my $STOPPED_FLAG = "$lbpconfigdir/gateway_stopped";
@@ -61,7 +68,11 @@ my %actions = (
 my %writes = map { $_ => 1 } qw(savebox deletebox savemqtt setop);
 
 print $cgi->header(-type => 'application/json', -charset => 'UTF-8');
-if (my $handler = $actions{$action}) {
+if ($action eq 'checksecpin') {
+    print $JSON->encode(check_secpin(scalar $cgi->param('secpin')));
+} elsif (!session_valid(scalar $cgi->param('token'))) {
+    print $JSON->encode({ ok => JSON::PP::false, auth => JSON::PP::true, error => 'SecurePIN erforderlich' });
+} elsif (my $handler = $actions{$action}) {
     my $result = $writes{$action} ? eval { with_cfg_lock($handler) } : eval { $handler->() };
     $result = { ok => JSON::PP::false, error => "Interner Fehler: $@" } if $@;
     print $JSON->encode($result);
@@ -81,6 +92,66 @@ sub param {
 }
 
 sub fail { return { ok => JSON::PP::false, error => $_[0] }; }
+
+# ---- SecurePIN und Sitzungen -----------------------------------------------------------------
+
+# Antwort wie im Core (error: 0 = richtig, 1 = falsch, 2 = Datei, 3 = gesperrt), dazu das Token.
+# Der Core reicht die PIN in einfachen Anführungszeichen an die Shell weiter; deshalb gehen nur
+# PINs im Format der Admin-Seite (4–10 Zeichen A–Z, a–z, 0–9) überhaupt an ihn.
+sub check_secpin {
+    my ($pin) = @_;
+    $pin //= '';
+    return { error => 1 } unless $pin =~ /^[A-Za-z0-9]{4,10}$/;
+    my $res = LoxBerry::System::check_securepin($pin);
+    return { error => int($res) } if $res;
+    cleanup_sessions();
+    my $token = new_token() or return { error => 2 };
+    make_session_dir() or return { error => 2 };
+    open(my $fh, '>', "$SESSION_DIR/$token") or return { error => 2 };
+    close $fh;
+    return { error => 0, token => $token };
+}
+
+sub new_token {
+    open(my $fh, '<:raw', '/dev/urandom') or return;
+    my $n = read($fh, my $buf, 16);
+    close $fh;
+    return unless $n && $n == 16;
+    return unpack('H*', $buf);
+}
+
+sub make_session_dir {
+    for my $d ($SHMDIR, $SESSION_DIR) {
+        next if -d $d;
+        mkdir($d, 0700) or return 0;
+    }
+    chmod 0700, $SESSION_DIR;
+    return 1;
+}
+
+sub session_valid {
+    my ($token) = @_;
+    return 0 unless defined $token && $token =~ /^([0-9a-f]{32})$/;
+    my $file = "$SESSION_DIR/$1";
+    my $mtime = (stat $file)[9];
+    return 0 unless defined $mtime;
+    if (time - $mtime > $SESSION_TTL) {
+        unlink $file;
+        return 0;
+    }
+    utime(undef, undef, $file);
+    return 1;
+}
+
+sub cleanup_sessions {
+    opendir(my $dh, $SESSION_DIR) or return;
+    for my $f (readdir $dh) {
+        next unless $f =~ /^([0-9a-f]{32})$/;
+        my $mtime = (stat "$SESSION_DIR/$1")[9];
+        unlink "$SESSION_DIR/$1" if defined $mtime && time - $mtime > $SESSION_TTL;
+    }
+    closedir $dh;
+}
 
 sub with_cfg_lock {
     my ($code) = @_;
